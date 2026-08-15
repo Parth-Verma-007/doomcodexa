@@ -3,6 +3,7 @@ import { updateMeSchema } from '@codexa/shared';
 import { asyncHandler } from '../errors.js';
 import { currentUser, requireAuth } from '../../auth/context.js';
 import { toUserDto } from '../../db/models/index.js';
+import { config } from '../../config.js';
 
 export const meRouter: Router = Router();
 
@@ -15,6 +16,9 @@ meRouter.get(
     res.json({
       user: toUserDto(user),
       email: user.email,
+      // Drives whether the client renders a link to /admin. The API re-checks
+      // on every admin request; this only decides what to show.
+      isAdmin: config.adminEmails.has((user.email ?? '').toLowerCase()),
       preferences: user.preferences,
     });
   }),

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
+import { adminRouter } from './admin.js';
 import { meRouter } from './me.js';
 import { projectsRouter } from './projects.js';
 import { filesRouter, projectFilesRouter } from './files.js';
@@ -21,6 +22,8 @@ apiRouter.use(
 );
 
 apiRouter.use('/me', meRouter);
+// Read-only, and 404s for anyone not in ADMIN_EMAILS.
+apiRouter.use('/admin', adminRouter);
 apiRouter.use('/projects/:projectId/files', projectFilesRouter);
 apiRouter.use('/projects', projectsRouter);
 apiRouter.use('/files', filesRouter);

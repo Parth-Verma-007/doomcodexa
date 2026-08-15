@@ -192,7 +192,7 @@ function Ide() {
 // ─── Toolbar ──────────────────────────────────────────────────────────────────
 
 function Toolbar() {
-  const { project, projectId, files, canEdit } = useProject();
+  const { project, projectId, files, canEdit, members } = useProject();
   const activeFileId = useUiStore((s) => s.activeFileId);
   const toggleTerminal = useUiStore((s) => s.toggleTerminal);
   const current = useRunStore((s) => s.current);
@@ -314,6 +314,7 @@ function Toolbar() {
           onClose={() => setSharing(false)}
           project={localProject}
           onProjectChange={setLocalProject}
+          members={members}
         />
       ) : null}
     </header>

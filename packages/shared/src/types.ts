@@ -55,6 +55,11 @@ export interface ProjectDto {
   shareToken: string | null;
   shareRole: Exclude<Role, 'owner'>;
   memberCount: number;
+  /**
+   * A few members, for showing faces on a card without a second request.
+   * Capped — `memberCount` remains the authority on how many there are.
+   */
+  members: UserDto[];
   /** The requesting user's role on this project. */
   myRole: Role;
   createdAt: string;
@@ -188,6 +193,39 @@ export interface PresencePeer {
   user: UserDto;
   role: Role;
   activeFileId: string | null;
+}
+
+// ─── Admin ────────────────────────────────────────────────────────────────────
+
+/**
+ * What `/api/admin/overview` returns.
+ *
+ * Read-only by design: every destructive action an admin might want already
+ * exists as an owner-scoped route with its own checks, and a second
+ * authorisation path around the same objects is how the two drift apart.
+ */
+export interface AdminOverview {
+  totals: { users: number; projects: number; files: number; runs: number; runsToday: number };
+  execution: {
+    available: boolean;
+    unavailableReason: string | null;
+    active: number;
+    queued: number;
+  };
+  process: { uptimeSeconds: number; nodeVersion: string; rssBytes: number; env: string };
+  runsByLanguage: { language: string; count: number }[];
+  runsByStatus: { status: string; count: number }[];
+  recentRuns: {
+    id: string;
+    language: string;
+    status: string;
+    entrypoint: string;
+    runMs: number | null;
+    by: UserDto | null;
+    createdAt: string;
+  }[];
+  newestUsers: (UserDto & { email: string; createdAt: string })[];
+  messages: number;
 }
 
 // ─── Errors ───────────────────────────────────────────────────────────────────

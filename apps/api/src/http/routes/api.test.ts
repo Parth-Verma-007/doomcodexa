@@ -453,6 +453,126 @@ describe('history endpoints', () => {
   });
 });
 
+describe('admin', () => {
+  /**
+   * The admin list is configuration, not data, so it cannot be escalated into
+   * from inside the app. These tests assert the closed default: with
+   * `ADMIN_EMAILS` unset — which is how the test env boots — nobody is an
+   * admin, including a project owner.
+   */
+  it('hides the admin API from everyone when no admins are configured', async () => {
+    // 404 rather than 403: the route should not be discoverable by probing.
+    await request(app).get('/api/admin/overview').set(as(OWNER)).expect(404);
+  });
+
+  it('does not claim anyone is an admin on /api/me', async () => {
+    const res = await request(app).get('/api/me').set(as(OWNER)).expect(200);
+    expect(res.body.isAdmin).toBe(false);
+  });
+
+  it('gives away nothing about the route in its refusal', async () => {
+    // Not `401`: this suite runs with AUTH_DEV_BYPASS, so every request is
+    // authenticated as the dev identity and there is no unauthenticated state
+    // to observe. What matters here is that a non-admin's rejection is
+    // indistinguishable from a URL that does not exist.
+    const admin = await request(app).get('/api/admin/overview').set(as(OWNER)).expect(404);
+    const nonsense = await request(app).get('/api/admin/nope').set(as(OWNER)).expect(404);
+
+    expect(admin.body.error.code).toBe('not_found');
+    expect(admin.body.error.code).toBe(nonsense.body.error.code);
+    expect(JSON.stringify(admin.body)).not.toMatch(/admin|permission|forbidden/i);
+  });
+});
+
+describe('project list', () => {
+  it('carries member faces so a card needs no extra request', async () => {
+    const project = await createProject();
+    await addMember(project.id, EDITOR, 'editor');
+
+    const res = await request(app).get('/api/projects').set(as(OWNER)).expect(200);
+    const listed = res.body.projects.find((p: { id: string }) => p.id === project.id);
+
+    expect(listed.memberCount).toBe(2);
+    expect(listed.members).toHaveLength(2);
+    // Enough to render an avatar, and nothing more.
+    expect(listed.members[0]).toHaveProperty('username');
+    expect(listed.members[0]).toHaveProperty('color');
+    expect(listed.members[0]).not.toHaveProperty('email');
+  });
+
+  it('shows a doubly-recorded member once', async () => {
+    // Regression: joining read the project, checked for an existing membership,
+    // then pushed and saved. Two simultaneous redemptions — a double-clicked
+    // link, two tabs, or React StrictMode firing the join effect twice — both
+    // read a list without the joiner and both appended. The write is atomic
+    // now, but documents written before that guard still hold the repeat, and
+    // it reached the UI as a duplicated avatar (colliding React keys) and an
+    // inflated count. The duplicate is pushed directly here because the fixed
+    // write path can no longer produce one.
+    const project = await createProject();
+    await addMember(project.id, EDITOR, 'editor');
+
+    const { Project } = await import('../../db/models/index.js');
+    const stored = await Project.findById(project.id);
+    const duplicate = stored!.members[1]!;
+    await Project.updateOne(
+      { _id: project.id },
+      { $push: { members: { userId: duplicate.userId, role: 'editor', addedAt: new Date() } } },
+    );
+    expect((await Project.findById(project.id))!.members).toHaveLength(3);
+
+    const res = await request(app).get('/api/projects').set(as(OWNER)).expect(200);
+    const listed = res.body.projects.find((p: { id: string }) => p.id === project.id);
+
+    expect(listed.memberCount).toBe(2);
+    expect(listed.members).toHaveLength(2);
+    expect(new Set(listed.members.map((m: { id: string }) => m.id)).size).toBe(2);
+
+    const members = await request(app)
+      .get(`/api/projects/${project.id}/members`)
+      .set(as(OWNER))
+      .expect(200);
+    expect(members.body.members).toHaveLength(2);
+  });
+
+  it('adds nothing when an existing member redeems the link again', async () => {
+    const project = await createProject();
+    const share = await request(app)
+      .post(`/api/projects/${project.id}/share`)
+      .set(as(OWNER))
+      .send({ role: 'editor' })
+      .expect(200);
+    const token = share.body.project.shareToken as string;
+
+    for (let i = 0; i < 3; i += 1) {
+      await request(app).post('/api/projects/join').set(as(EDITOR)).send({ token }).expect(200);
+    }
+
+    const res = await request(app).get('/api/projects').set(as(OWNER)).expect(200);
+    const listed = res.body.projects.find((p: { id: string }) => p.id === project.id);
+    expect(listed.memberCount).toBe(2);
+  });
+
+  it('never leaks another owner’s share token', async () => {
+    const project = await createProject();
+    await request(app)
+      .post(`/api/projects/${project.id}/share`)
+      .set(as(OWNER))
+      .send({ role: 'viewer' })
+      .expect(200);
+    await addMember(project.id, VIEWER, 'viewer');
+
+    const mine = await request(app).get('/api/projects').set(as(OWNER)).expect(200);
+    const theirs = await request(app).get('/api/projects').set(as(VIEWER)).expect(200);
+
+    const asOwner = mine.body.projects.find((p: { id: string }) => p.id === project.id);
+    const asViewer = theirs.body.projects.find((p: { id: string }) => p.id === project.id);
+
+    expect(asOwner.shareToken).toEqual(expect.any(String));
+    expect(asViewer.shareToken).toBeNull();
+  });
+});
+
 describe('error envelope', () => {
   it('uses one shape for every failure', async () => {
     const res = await request(app).get('/api/projects/not-an-id').set(as(OWNER)).expect(404);

@@ -27,6 +27,7 @@ import {
   generateShareToken,
   listMembers,
   listProjectsFor,
+  memberPreviewsFor,
   redeemShareToken,
   removeMember,
   setMemberRole,
@@ -44,8 +45,12 @@ projectsRouter.get(
   asyncHandler(async (req, res) => {
     const user = currentUser(req);
     const projects = await listProjectsFor(user._id);
+    // One query for every card's faces, rather than one query per card.
+    const previews = await memberPreviewsFor(projects);
     res.json({
-      projects: projects.map((p) => toProjectDto(p, roleFor(p, user._id) ?? 'viewer')),
+      projects: projects.map((p) =>
+        toProjectDto(p, roleFor(p, user._id) ?? 'viewer', previews.get(String(p._id)) ?? []),
+      ),
     });
   }),
 );

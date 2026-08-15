@@ -1,5 +1,5 @@
 import { Schema, type Types, model, type HydratedDocument, type InferSchemaType } from 'mongoose';
-import { LANGUAGE_IDS, ROLES, type ProjectDto, type Role } from '@codexa/shared';
+import { LANGUAGE_IDS, ROLES, type ProjectDto, type Role, type UserDto } from '@codexa/shared';
 
 const memberSchema = new Schema(
   {
@@ -62,7 +62,30 @@ export function roleFor(project: ProjectDoc, userId: Types.ObjectId | string): R
   return project.isPublic ? 'viewer' : null;
 }
 
-export function toProjectDto(project: ProjectDoc, myRole: Role): ProjectDto {
+/**
+ * The membership list with each user appearing once, earliest entry winning.
+ *
+ * The write path adds members atomically so it cannot record anyone twice, but
+ * documents written before that guard existed can still hold a repeat, and a
+ * person shown twice — or counted twice — is worse than one shown late. Every
+ * read that surfaces members to a client goes through here.
+ */
+export function distinctMembers(project: ProjectDoc): ProjectDoc['members'] {
+  const seen = new Set<string>();
+  return project.members.filter((m) => {
+    const id = String(m.userId);
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  }) as ProjectDoc['members'];
+}
+
+export function toProjectDto(
+  project: ProjectDoc,
+  myRole: Role,
+  /** Member faces for a card. Omitted where the caller has no cheap way to load them. */
+  members: UserDto[] = [],
+): ProjectDto {
   return {
     id: String(project._id),
     name: project.name,
@@ -78,7 +101,8 @@ export function toProjectDto(project: ProjectDoc, myRole: Role): ProjectDto {
     // The share token is a bearer credential: only ever expose it to an owner.
     shareToken: myRole === 'owner' ? (project.shareToken ?? null) : null,
     shareRole: (project.shareRole ?? 'editor') as ProjectDto['shareRole'],
-    memberCount: project.members.length,
+    memberCount: distinctMembers(project).length,
+    members,
     myRole,
     createdAt: project.createdAt.toISOString(),
     updatedAt: project.updatedAt.toISOString(),

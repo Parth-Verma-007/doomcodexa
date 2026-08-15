@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { Check, Copy, Link2, RefreshCw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { ProjectDto } from '@codexa/shared';
+import type { MemberDto, ProjectDto } from '@codexa/shared';
 import { api, ApiError } from '../../lib/api.js';
 import { Dialog } from '../../components/Dialog.js';
 import { Button } from '../../components/Button.js';
 import { Avatar } from '../../components/Avatar.js';
-import { useProject } from '../project/ProjectContext.js';
 import { cn } from '../../lib/utils.js';
 
 export function ShareDialog({
@@ -14,13 +13,20 @@ export function ShareDialog({
   onClose,
   project,
   onProjectChange,
+  members,
 }: {
   open: boolean;
   onClose: () => void;
   project: ProjectDto;
   onProjectChange: (project: ProjectDto) => void;
+  /**
+   * Passed in rather than read from `ProjectContext`. The dashboard has no such
+   * context — it only has the list response — and reading it here meant sharing
+   * was reachable from exactly one place in the app.
+   */
+  members?: MemberDto[];
 }) {
-  const { members } = useProject();
+  const people = members ?? [];
   const [role, setRole] = useState<'editor' | 'viewer'>(project.shareRole);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -154,10 +160,10 @@ export function ShareDialog({
 
       <div>
         <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-muted">
-          People with access ({members.length})
+          People with access ({people.length})
         </h3>
         <ul className="space-y-1.5">
-          {members.map((member) => (
+          {people.map((member) => (
             <li key={member.user.id} className="flex items-center gap-2.5">
               <Avatar user={member.user} size={24} />
               <span className="truncate text-sm">{member.user.username}</span>

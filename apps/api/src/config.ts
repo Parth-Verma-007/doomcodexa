@@ -48,6 +48,18 @@ const envSchema = z.object({
   /** Set to 1 to disable execution entirely (e.g. a host with no compilers). */
   EXEC_DISABLED: booleanish.default(false),
 
+  /**
+   * Comma-separated emails allowed into /admin.
+   *
+   * Deliberately an env var rather than a flag on the user document. An admin
+   * bit in the database is one bad write away from privilege escalation, and
+   * this app already lets users edit shared state. Configuration cannot be
+   * escalated into from inside the application at all — the worst an attacker
+   * with database access can do is rename themselves, not grant themselves
+   * anything. Empty means nobody is an admin and /admin 404s for everyone.
+   */
+  ADMIN_EMAILS: z.string().default(''),
+
   METRICS_USER: z.string().default('codexa'),
   METRICS_PASSWORD: z.string().default(''),
 });
@@ -118,6 +130,13 @@ export const config = {
     maxOutputBytes: env.EXEC_MAX_OUTPUT_BYTES,
     workspaceRoot: env.EXEC_WORKSPACE_ROOT || path.join(os.tmpdir(), 'codexa-workspaces'),
   },
+
+  /** Lower-cased once here so every comparison is a plain lookup. */
+  adminEmails: new Set(
+    env.ADMIN_EMAILS.split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean),
+  ),
 
   metrics: {
     user: env.METRICS_USER,

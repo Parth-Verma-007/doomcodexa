@@ -20,6 +20,11 @@ const ProjectPage = lazy(() =>
   import('./routes/ProjectPage.js').then((m) => ({ default: m.ProjectPage })),
 );
 const JoinPage = lazy(() => import('./routes/JoinPage.js').then((m) => ({ default: m.JoinPage })));
+// Lazy like the rest: most accounts will never open it, and it should not cost
+// them anything that they could have.
+const AdminPage = lazy(() =>
+  import('./routes/AdminPage.js').then((m) => ({ default: m.AdminPage })),
+);
 
 export function App() {
   useClerkTokenBridge();
@@ -67,6 +72,14 @@ function AppRoutes() {
         element={
           <RequireAuth>
             <Dashboard />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          <RequireAuth>
+            <AdminPage />
           </RequireAuth>
         }
       />

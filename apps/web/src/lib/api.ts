@@ -1,4 +1,5 @@
 import type {
+  AdminOverview,
   CreateFileInput,
   CreateProjectInput,
   ErrorCode,
@@ -112,7 +113,15 @@ export interface ProjectDetail {
 }
 
 export const api = {
-  me: () => call<{ user: UserDto; email: string; preferences: Record<string, unknown> }>('/api/me'),
+  me: () =>
+    call<{
+      user: UserDto;
+      email: string;
+      isAdmin: boolean;
+      preferences: Record<string, unknown>;
+    }>('/api/me'),
+
+  adminOverview: () => call<AdminOverview>('/api/admin/overview'),
 
   updatePreferences: (preferences: Record<string, unknown>) =>
     call<{ preferences: Record<string, unknown> }>('/api/me', {
