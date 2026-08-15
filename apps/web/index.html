@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en" class="dark" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Codexa — collaborative coding</title>
+    <meta
+      name="description"
+      content="Code together in real time. C, C++, Java and Python, with live sync, voice and one-click execution."
+    />
+    <meta name="color-scheme" content="dark light" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <script>
+      /*
+       * Theme, applied before first paint.
+       *
+       * React can only set this in an effect, which is one paint too late — a
+       * light-theme user would see the dark scheme flash first. So we read the
+       * same persisted key the store writes and stamp <html> here. Wrapped in
+       * try/catch because localStorage throws outright when a browser is set to
+       * block site data, and a theme preference must never break boot.
+       */
+      (function () {
+        try {
+          var saved = JSON.parse(localStorage.getItem('codexa-ui') || '{}').state || {};
+          var theme = saved.theme;
+          // 'system' is a value only a pre-v1 store can hold. The store's own
+          // migration rewrites it a moment later, using this same rule — match
+          // it here or the page paints one theme and then swaps to the other.
+          if (theme === 'system') {
+            theme = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+          }
+          var mode = theme === 'light' ? 'light' : 'dark';
+          var root = document.documentElement;
+          root.dataset.theme = mode;
+          root.classList.toggle('light', mode === 'light');
+          root.classList.toggle('dark', mode === 'dark');
+        } catch (_) {
+          /* keep the markup's default */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

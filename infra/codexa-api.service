@@ -1,0 +1,49 @@
+# /etc/systemd/system/codexa-api.service
+#
+# The API runs directly on the host so it can spawn compilers as child
+# processes. The host therefore needs the toolchains installed:
+#
+#   sudo apt install build-essential default-jdk python3
+#   sudo useradd --system --home /opt/codexa --shell /usr/sbin/nologin codexa
+#   sudo systemctl enable --now codexa-api
+#
+# That user is what submitted code runs as, so give it nothing it does not need.
+
+[Unit]
+Description=Codexa API (Express + Socket.IO)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=codexa
+Group=codexa
+WorkingDirectory=/opt/codexa
+EnvironmentFile=/opt/codexa/.env
+ExecStart=/usr/bin/node /opt/codexa/apps/api/dist/index.js
+Restart=always
+RestartSec=3
+
+# Hardening. The API itself needs very little: a network socket and a scratch
+# directory for run workspaces.
+NoNewPrivileges=true
+PrivateTmp=false
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/codexa/workspaces
+RuntimeDirectory=codexa
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+
+LimitNOFILE=65535
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=codexa-api
+
+[Install]
+WantedBy=multi-user.target

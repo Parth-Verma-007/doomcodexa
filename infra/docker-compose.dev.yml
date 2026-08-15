@@ -1,0 +1,27 @@
+# Local development: Mongo only.
+#
+# The API deliberately runs on the host (`npm run dev`) rather than in a
+# container, because it needs to talk to the host's Docker daemon to spawn
+# runners. Sharing the daemon socket into a container is the worst version of
+# the risk documented in docs/SECURITY.md — so we don't do it, even locally.
+
+name: codexa-dev
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:27017:27017'
+    volumes:
+      - mongo-data:/data/db
+    command: ['--wiredTigerCacheSizeGB', '0.5']
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  mongo-data:

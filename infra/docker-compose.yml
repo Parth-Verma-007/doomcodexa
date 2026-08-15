@@ -1,0 +1,78 @@
+# Production stack for the single VPS (§15).
+#
+# NOTE: the API is intentionally NOT in this file. It runs on the host under
+# systemd (see infra/codexa-api.service) so that the Docker daemon socket is
+# never mounted into a container. Compose here owns the stateful and edge
+# pieces only: Mongo and Caddy.
+
+name: codexa
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    # Bound to loopback only; the API reaches it over the host network.
+    ports:
+      - '127.0.0.1:27017:27017'
+    volumes:
+      - mongo-data:/data/db
+      - ./backups:/backups
+    environment:
+      MONGO_INITDB_DATABASE: codexa
+    command: ['--wiredTigerCacheSizeGB', '1']
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', "db.adminCommand('ping').ok"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    network_mode: host # so `reverse_proxy 127.0.0.1:4000` reaches the host-run API
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      CODEXA_API_DOMAIN: ${CODEXA_API_DOMAIN:?set CODEXA_API_DOMAIN}
+      CODEXA_ACME_EMAIL: ${CODEXA_ACME_EMAIL:?set CODEXA_ACME_EMAIL}
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  # Nightly mongodump + prune. Restore is documented in docs/RUNBOOK.md and
+  # must be rehearsed once before you rely on it.
+  backup:
+    image: mongo:7
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    volumes:
+      - ./backups:/backups
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        while true; do
+          STAMP=$$(date +%Y%m%d-%H%M%S)
+          mongodump --uri="mongodb://mongo:27017/codexa" --archive="/backups/codexa-$$STAMP.gz" --gzip \
+            && echo "backup ok: $$STAMP" \
+            || echo "backup FAILED: $$STAMP"
+          find /backups -name 'codexa-*.gz' -mtime +14 -delete
+          sleep 86400
+        done
+
+volumes:
+  mongo-data:
+  caddy-data:
+  caddy-config:

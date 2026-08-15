@@ -1,0 +1,36 @@
+node_modules/
+dist/
+build/
+coverage/
+.turbo/
+*.tsbuildinfo
+
+.env
+.env.local
+.env.*.local
+!.env.example
+
+.DS_Store
+Thumbs.db
+
+logs/
+*.log
+npm-debug.log*
+
+playwright-report/
+test-results/
+.playwright/
+
+data/
+mongo-data/
+workspaces/
+
+# Local Mongo data when running without Docker (scripts/local-mongo.mjs)
+.local-mongo-data/
+
+# Ad-hoc visual check output (apps/web/e2e/shot.mjs)
+screenshots/
+
+# Claude Code: `settings.json` is shared project config and is committed.
+# `settings.local.json` is personal (your own permission grants) and is not.
+.claude/settings.local.json

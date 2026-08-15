@@ -1,0 +1,26 @@
+# Everything that would bloat the build context or leak local state into an
+# image. The Dockerfile copies workspaces explicitly, so this is belt and braces.
+node_modules
+**/node_modules
+**/dist
+**/build
+**/coverage
+**/*.tsbuildinfo
+
+.git
+.github
+.claude
+
+.env
+.env.local
+.env.*.local
+
+.local-mongo-data
+**/screenshots
+playwright-report
+test-results
+
+docs
+infra
+runners
+scripts

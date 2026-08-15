@@ -1,0 +1,43 @@
+{
+	email {$CODEXA_ACME_EMAIL}
+	servers {
+		protocols h1 h2 h3
+	}
+}
+
+# Caddy terminates TLS and proxies to the host-run API.
+# `reverse_proxy` upgrades WebSocket connections with no extra configuration,
+# which is most of why we picked it over nginx.
+{$CODEXA_API_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Prometheus scrape endpoint is basic-auth'd by the API itself, but keep it
+	# off the public internet as well.
+	@metrics path /metrics
+	handle @metrics {
+		@notLocal not remote_ip 127.0.0.1 ::1 10.0.0.0/8
+		respond @notLocal 403
+		reverse_proxy 127.0.0.1:4000
+	}
+
+	# Socket.IO needs long-lived connections; disable the default flush interval
+	# buffering so streamed run output reaches the browser immediately.
+	@socketio path /socket.io/*
+	handle @socketio {
+		reverse_proxy 127.0.0.1:4000 {
+			flush_interval -1
+		}
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:4000
+	}
+}

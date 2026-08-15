@@ -1,0 +1,396 @@
+@import 'tailwindcss';
+@import '@xterm/xterm/css/xterm.css';
+
+/*
+ * Tailwind v4 is CSS-first: the design tokens live here rather than in a
+ * tailwind.config.js. Everything is expressed as a CSS variable so the editor
+ * chrome and the Monaco theme can be driven from one source.
+ *
+ * ─── How theming works ────────────────────────────────────────────────────────
+ *
+ * Exactly two themes: dark and light. `<html data-theme>` says which. The app
+ * deliberately does not follow `prefers-color-scheme` — the choice is the
+ * user's and it sticks until they change it.
+ *
+ * The colour values are GitHub's published Primer tokens, so the app sits
+ * comfortably next to what a developer already has open in the next tab. The
+ * `@theme` block is the dark one and doubles as the default: it compiles to
+ * `:root`, and the `[data-theme='light']` block below has equal specificity but
+ * comes later in the file, so it wins.
+ */
+@theme {
+  --color-surface-0: #0d1117; /* canvas.default */
+  --color-surface-1: #161b22; /* canvas.subtle  */
+  --color-surface-2: #21262d;
+  --color-surface-3: #30363d;
+  --color-border: #30363d; /* border.default */
+  --color-border-strong: #484f58;
+
+  --color-ink: #e6edf3; /* fg.default */
+  --color-ink-muted: #8b949e; /* fg.muted   */
+  --color-ink-faint: #6e7681; /* fg.subtle  */
+
+  --color-accent: #2f81f7; /* accent.fg */
+  --color-accent-hover: #58a6ff;
+  --color-success: #3fb950;
+  --color-warning: #d29922;
+  --color-danger: #f85149;
+
+  --font-mono:
+    'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+
+  --radius-panel: 0.5rem;
+}
+
+/*
+ * Presentational knobs that are not part of the colour scale but still have to
+ * flip with it: a white inset highlight and a heavy black shadow both read as
+ * "glass" on a dark surface and as "dirty" on a light one.
+ */
+:root {
+  color-scheme: dark;
+  /* The toggle's track. Its original value assumed a light page; on a near
+     black header a 8%-black track is invisible and the knob looks unmoored. */
+  --toggle-track: rgba(255, 255, 255, 0.14);
+  --glass-highlight: color-mix(in oklab, white 10%, transparent);
+  --glass-shadow: 0 8px 32px rgb(0 0 0 / 0.24);
+  --shadow-card: 0 8px 24px rgb(0 0 0 / 0.2);
+  --sheen-tint: color-mix(in oklab, white 26%, transparent);
+  --bloom-opacity: 0.5;
+
+  /* Syntax colours for code rendered outside Monaco — the landing page's
+     language carousel. Same Primer values the editor themes use in
+     lib/monaco.ts, so the marketing panel and the real editor agree. */
+  --syntax-kw: #ff7b72;
+  --syntax-str: #a5d6ff;
+  --syntax-type: #ffa657;
+  --syntax-fn: #d2a8ff;
+  --syntax-num: #79c0ff;
+  --syntax-com: #8b949e;
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+
+  --color-surface-0: #ffffff;
+  --color-surface-1: #f6f8fa;
+  --color-surface-2: #eaeef2;
+  --color-surface-3: #d8dee4;
+  --color-border: #d0d7de;
+  --color-border-strong: #afb8c1;
+
+  --color-ink: #1f2328;
+  --color-ink-muted: #656d76;
+  --color-ink-faint: #8c959f;
+
+  --color-accent: #0969da;
+  --color-accent-hover: #0550ae;
+  /* The dark scheme's semantic colours are too light to read on white. */
+  --color-success: #1a7f37;
+  --color-warning: #9a6700;
+  --color-danger: #cf222e;
+
+  /* The supplied value, which is what this control was designed against. */
+  --toggle-track: rgba(0, 0, 0, 0.08);
+
+  /* A white sheen is invisible on white, and a 24%-black drop shadow turns a
+     frosted panel grey. */
+  --glass-highlight: color-mix(in oklab, white 70%, transparent);
+  --glass-shadow: 0 6px 24px rgb(31 35 40 / 0.08);
+  --shadow-card: 0 6px 18px rgb(31 35 40 / 0.08);
+  --sheen-tint: color-mix(in oklab, white 55%, transparent);
+  /* The blooms sit on white here, where the same opacity reads as a stain. */
+  --bloom-opacity: 0.3;
+
+  /* The dark scheme's syntax hues are tuned for a near-black background and go
+     pale and unreadable on white. These are Primer's light values. */
+  --syntax-kw: #cf222e;
+  --syntax-str: #0a3069;
+  --syntax-type: #953800;
+  --syntax-fn: #8250df;
+  --syntax-num: #0550ae;
+  --syntax-com: #6e7781;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-surface-0);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    /* The IDE owns its own scrolling; the page itself must never scroll
+       horizontally when a panel holds something wide. */
+    overflow: hidden;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-border-strong);
+    border-radius: 5px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-ink-faint);
+    background-clip: content-box;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/*
+ * ─── Decorative surfaces ──────────────────────────────────────────────────────
+ *
+ * Everything here is CSS only — no WebGL, no animation library. That keeps the
+ * landing page's critical path at one small JS chunk, and every effect
+ * composites on the GPU rather than running per-frame JavaScript.
+ *
+ * The global `prefers-reduced-motion` rule above pins all of these to their
+ * first frame, so the drift disappears for anyone who has asked for that.
+ */
+@layer components {
+  .codexa-bloom {
+    position: absolute;
+    border-radius: 9999px;
+    /* Very large blur + low opacity reads as light, not as a coloured blob. */
+    filter: blur(72px);
+    opacity: var(--bloom-opacity);
+    will-change: transform;
+  }
+
+  .codexa-bloom-a {
+    top: -18%;
+    left: 8%;
+    width: 42vw;
+    height: 42vw;
+    max-width: 620px;
+    max-height: 620px;
+    background: radial-gradient(
+      circle,
+      color-mix(in oklab, var(--color-accent) 55%, transparent),
+      transparent 70%
+    );
+    animation: codexa-drift-a 26s ease-in-out infinite alternate;
+  }
+
+  .codexa-bloom-b {
+    top: -8%;
+    right: 4%;
+    width: 36vw;
+    height: 36vw;
+    max-width: 520px;
+    max-height: 520px;
+    background: radial-gradient(
+      circle,
+      color-mix(in oklab, #9c6bff 45%, transparent),
+      transparent 70%
+    );
+    animation: codexa-drift-b 32s ease-in-out infinite alternate;
+  }
+
+  .codexa-bloom-c {
+    top: 24%;
+    left: 38%;
+    width: 30vw;
+    height: 30vw;
+    max-width: 460px;
+    max-height: 460px;
+    background: radial-gradient(
+      circle,
+      color-mix(in oklab, #21b8a6 35%, transparent),
+      transparent 70%
+    );
+    animation: codexa-drift-c 38s ease-in-out infinite alternate;
+    opacity: calc(var(--bloom-opacity) * 0.7);
+  }
+
+  /* Frosted surface: a translucent panel that lets the bloom read through. */
+  .codexa-glass {
+    background: color-mix(in oklab, var(--color-surface-1) 70%, transparent);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    border: 1px solid color-mix(in oklab, var(--color-border-strong) 60%, transparent);
+    /* Inset highlight along the top edge — what sells it as a physical pane. */
+    box-shadow:
+      inset 0 1px 0 var(--glass-highlight),
+      var(--glass-shadow);
+  }
+
+  /* A one-pass sheen, on hover only, for primary calls to action. */
+  .codexa-sheen {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .codexa-sheen::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: linear-gradient(105deg, transparent 35%, var(--sheen-tint) 50%, transparent 65%);
+    transform: translateX(-120%);
+    pointer-events: none;
+  }
+
+  .codexa-sheen:hover::after {
+    transform: translateX(120%);
+    transition: transform 720ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /*
+   * Corner crosses on a framed panel. Drawn with two crossed gradients per
+   * corner so there is no extra markup and no SVG request.
+   */
+  .codexa-corners::before,
+  .codexa-corners::after {
+    content: '';
+    position: absolute;
+    width: 9px;
+    height: 9px;
+    background:
+      linear-gradient(var(--color-border-strong), var(--color-border-strong)) center / 100% 1px
+        no-repeat,
+      linear-gradient(var(--color-border-strong), var(--color-border-strong)) center / 1px 100%
+        no-repeat;
+    pointer-events: none;
+  }
+
+  .codexa-corners::before {
+    top: -5px;
+    left: -5px;
+    box-shadow: calc(100% + 10px) 0 0 0 transparent;
+  }
+
+  .codexa-corners::after {
+    right: -5px;
+    bottom: -5px;
+  }
+
+  /*
+  }
+
+  /* Hairline that fades at both ends — a divider that does not box things in. */
+  .codexa-rule {
+    height: 1px;
+    background: linear-gradient(
+      to right,
+      transparent,
+      var(--color-border-strong) 20%,
+      var(--color-border-strong) 80%,
+      transparent
+    );
+  }
+}
+
+@keyframes codexa-drift-a {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(6%, 8%, 0) scale(1.12);
+  }
+}
+
+@keyframes codexa-drift-b {
+  from {
+    transform: translate3d(0, 0, 0) scale(1.08);
+  }
+  to {
+    transform: translate3d(-8%, 6%, 0) scale(0.94);
+  }
+}
+
+@keyframes codexa-drift-c {
+  from {
+    transform: translate3d(0, 0, 0) scale(0.95);
+  }
+  to {
+    transform: translate3d(5%, -7%, 0) scale(1.15);
+  }
+}
+
+/*
+ * Remote cursors and selections (§12).
+ *
+ * Monaco decorations cannot carry a per-user colour through a class name, so
+ * each peer gets a generated rule injected at runtime keyed by client id. These
+ * are the shared parts.
+ */
+@layer components {
+  .codexa-remote-selection {
+    /* Sits behind the text so it never affects legibility. */
+    mix-blend-mode: normal;
+    opacity: 0.28;
+    border-radius: 2px;
+  }
+
+  .codexa-remote-cursor {
+    position: relative;
+    border-left: 2px solid;
+    margin-left: -1px;
+    /* Zero-width so it never shifts the text it sits between. */
+    box-sizing: border-box;
+    z-index: 5;
+  }
+
+  .codexa-remote-cursor::after {
+    content: attr(data-name);
+    position: absolute;
+    top: -1.15em;
+    left: -2px;
+    padding: 0 4px;
+    font-size: 11px;
+    line-height: 1.15em;
+    font-family: var(--font-sans);
+    white-space: nowrap;
+    border-radius: 3px 3px 3px 0;
+    color: #fff;
+    background: inherit;
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 220ms ease 1.8s;
+  }
+
+  /* The label fades after a moment of stillness so it stops covering code. */
+  .codexa-remote-cursor.is-idle::after {
+    opacity: 0;
+  }
+}
+
+/* xterm should fill its pane and inherit the app's mono stack. */
+.xterm {
+  height: 100%;
+  padding: 8px 10px;
+}
+.xterm-viewport {
+  background-color: transparent !important;
+}
