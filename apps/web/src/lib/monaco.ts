@@ -1,7 +1,30 @@
-// `monaco-editor/esm/vs/editor/editor.api` is the editor without any language
-// grammars. The bare `monaco-editor` entry pulls in all ~80 of them plus the
-// TypeScript, JSON, CSS and HTML language services — several megabytes for
-// languages this IDE does not run. We add back only what we highlight.
+/**
+ * `edcore.main`, not `editor.api` and not `monaco-editor`.
+ *
+ * The three entry points are easy to confuse and the difference is not cosmetic:
+ *
+ *   editor.api    the API surface *only* — no editor contributions at all
+ *   edcore.main   editor.api + all 62 contributions, and no languages
+ *   monaco-editor edcore.main + ~80 grammars + the TS/JSON/CSS/HTML services
+ *
+ * This file used to import `editor.api`, chosen to drop the grammars and
+ * language services this IDE has no use for. That worked — but it also silently
+ * removed every contribution: autocomplete, find, hover, the context menu,
+ * folding, bracket matching and comment toggling. The editor still rendered and
+ * highlighted, so nothing looked broken; the features were simply never
+ * registered, and `editor.action.triggerSuggest` did nothing because the
+ * suggest controller did not exist.
+ *
+ * `edcore.main` is the right seam: it keeps the language trimming (grammars are
+ * added back selectively below) while restoring the editor itself.
+ *
+ * It is imported twice on purpose. `edcore.main.js` ships no type declarations,
+ * so the side-effect import registers the contributions and the named import
+ * from `editor.api` supplies the types. ES modules are singletons and
+ * `edcore.main` re-exports `editor.api`, so both names refer to one instance —
+ * this is not two copies of Monaco.
+ */
+import 'monaco-editor/esm/vs/editor/edcore.main.js';
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
 // `cpp.contribution` registers both the `c` and `cpp` grammars — there is no
 // separate `c/` module.
