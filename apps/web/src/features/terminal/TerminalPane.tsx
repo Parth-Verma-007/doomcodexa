@@ -17,7 +17,7 @@ import { useColorMode, useUiStore, type ThemeName } from '../../stores/uiStore.j
  * hundreds of chunks a second; routing those through `setState` would re-render
  * the tree on every one.
  *
- * Keystrokes go straight to the running container's stdin, which is what makes
+ * Keystrokes go straight to the running program's stdin, which is what makes
  * `scanf`, `Scanner` and `input()` behave the way they do in a real shell.
  */
 export function TerminalPane() {
@@ -188,7 +188,7 @@ export function TerminalPane() {
     };
   }, []);
 
-  // ─── Keystrokes → the container's stdin ─────────────────────────────────────
+  // ─── Keystrokes → the program's stdin ───────────────────────────────────────
   useEffect(() => {
     const terminal = terminalRef.current;
     if (!terminal) return;
@@ -199,8 +199,9 @@ export function TerminalPane() {
       // this too, so this is purely to avoid pointless traffic.
       if (!run || !isRunActive(run) || !run.mine) return;
 
-      // Echo locally: the PTY inside the container is not in echo mode for the
-      // browser, so without this the user cannot see what they are typing.
+      // Echo locally. The program reads a pipe rather than a terminal, so
+      // nothing echoes the keystrokes back — without this the user types into
+      // what looks like a dead terminal.
       terminal.write(data === '\r' ? '\r\n' : data);
       runSocket().emit('run:stdin', { runId: run.runId, data: data === '\r' ? '\n' : data });
     });

@@ -77,9 +77,18 @@ jobs:
       # Building proves it compiles; this proves the thing actually runs. Boot
       # it with execution disabled and no database, and check the liveness
       # route answers — that route deliberately does not touch Mongo.
+      # NODE_ENV=development is not incidental. The image bakes in
+      # NODE_ENV=production, and config.ts *deliberately* refuses to boot in
+      # production without Clerk keys, a metrics password, and with
+      # AUTH_DEV_BYPASS set — that refusal is a feature (docs/SECURITY.md §4.1).
+      # Without this override the container dies during module evaluation, and
+      # the loop below polls a corpse for sixty seconds. This job is checking
+      # that the image is well-formed and the toolchains are present, not that
+      # the production config gate works.
       - name: Boot it and check liveness
         run: |
           docker run -d --name codexa-api -p 4000:4000 \
+            -e NODE_ENV=development \
             -e EXEC_DISABLED=1 \
             -e MONGODB_URI=mongodb://127.0.0.1:27017/unused \
             -e AUTH_DEV_BYPASS=1 \

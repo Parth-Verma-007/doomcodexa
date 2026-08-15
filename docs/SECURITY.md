@@ -172,9 +172,9 @@ user multiply their rate limit by the number of nodes.
 
 ### 4.4 No antivirus or content scanning
 
-Users can store any text they like. There is no upload of binaries, and the
-workspace is mounted read-only into a network-less container, so stored content
-cannot be executed against anyone else.
+Users can store any text they like, and there is no binary upload. Note that
+stored content **is** executable by design — that is what the Run button does —
+so this risk is subsumed by §2 and §4.1 rather than mitigated separately.
 
 ---
 

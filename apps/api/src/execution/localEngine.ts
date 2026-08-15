@@ -5,8 +5,15 @@ import PQueue from 'p-queue';
 import { LANGUAGES, type LanguageId, type RunSpec, type RunStatus } from '@codexa/shared';
 import { config } from '../config.js';
 import { logger } from '../observability/logger.js';
+import {
+  activeRuns,
+  queueDepth,
+  runDuration,
+  runQueueWait,
+  runsTotal,
+} from '../observability/metrics.js';
 import { OutputStream } from './outputStream.js';
-import { validateJavaEntrypoint } from './languages.js';
+import { SOURCE_EXTENSIONS, validateJavaEntrypoint } from './languages.js';
 import { materialise, type Workspace } from './workspace.js';
 import type { EngineStats, ExecutionEngine, RunHandle, RunSink } from './types.js';
 
@@ -183,10 +190,17 @@ export class LocalExecutionEngine implements ExecutionEngine {
     };
     this.active.set(spec.runId, entry);
 
+    // Metrics are written here rather than inside the engine internals so that
+    // every terminal path — success, compile failure, timeout, kill, or the
+    // catch below — is counted exactly once.
+    const enqueuedAt = Date.now();
+    this.publishQueueGauges();
+
     void this.queue
-      .add(() => this.execute(spec, sink, toolchain, entry))
+      .add(() => this.execute(spec, sink, toolchain, entry, enqueuedAt))
       .catch((err) => {
         logger.error({ err, runId: spec.runId }, 'local run failed');
+        runsTotal.inc({ language: spec.language, status: 'failed' });
         sink({
           type: 'exit',
           status: 'failed',
@@ -198,6 +212,7 @@ export class LocalExecutionEngine implements ExecutionEngine {
       })
       .finally(() => {
         this.active.delete(spec.runId);
+        this.publishQueueGauges();
         settle();
       });
 
@@ -221,8 +236,33 @@ export class LocalExecutionEngine implements ExecutionEngine {
     sink: RunSink,
     toolchain: Toolchain,
     entry: ActiveRun,
+    enqueuedAt: number,
   ): Promise<void> {
+    // The queue admitted this run, so whatever it waited is now known.
+    runQueueWait.observe((Date.now() - enqueuedAt) / 1000);
+    const startedAt = Date.now();
+    this.publishQueueGauges();
     let workspace: Workspace | null = null;
+
+    /**
+     * The single exit point for a run.
+     *
+     * Every `return` below goes through here, so the terminal status is
+     * recorded exactly once no matter which way the run ended — success,
+     * compile failure, timeout or kill. Counting at the individual call sites
+     * would mean six places to forget.
+     */
+    const finish = (
+      status: RunStatus,
+      exitCode: number | null,
+      reason?: string,
+      runMs: number | null = null,
+    ): void => {
+      emitExit(sink, stream, status, exitCode, reason, runMs);
+      runsTotal.inc({ language: spec.language, status });
+      runDuration.observe({ language: spec.language }, (Date.now() - startedAt) / 1000);
+    };
+
     const stream = new OutputStream({
       // No sentinel: compile and run are two processes, so we already know
       // which output is which and drive the transition explicitly.
@@ -237,6 +277,23 @@ export class LocalExecutionEngine implements ExecutionEngine {
     try {
       workspace = await materialise(spec.runId, spec.language, spec.entrypoint, spec.files);
       const sources = await readManifest(workspace.dir);
+
+      // A compiled language with nothing to compile: the entrypoint is a header,
+      // or every source was renamed to an extension this language does not
+      // claim. Without this guard the compiler is invoked with no input files
+      // and the user gets `gcc: fatal error: no input files`, which says nothing
+      // about what they actually did wrong.
+      if (toolchain.compiler && sources.length === 0) {
+        stream.finish();
+        finish(
+          'error',
+          null,
+          `No ${LANGUAGES[spec.language].label} source files to compile. ` +
+            `Expected at least one file ending in ${SOURCE_EXTENSIONS[spec.language].join(' or ')}.`,
+        );
+        return;
+      }
+
       const buildDir = path.join(workspace.dir, '.codexa-build');
       await fs.mkdir(buildDir, { recursive: true });
 
@@ -257,9 +314,7 @@ export class LocalExecutionEngine implements ExecutionEngine {
 
         if (result.timedOut) {
           stream.finish();
-          emitExit(
-            sink,
-            stream,
+          finish(
             'timeout',
             null,
             `Compilation took longer than ${config.exec.compileTimeoutMs / 1000}s.`,
@@ -268,18 +323,12 @@ export class LocalExecutionEngine implements ExecutionEngine {
         }
         if (entry.killed) {
           stream.finish();
-          emitExit(
-            sink,
-            stream,
-            entry.killStatus ?? 'killed',
-            null,
-            entry.killReason ?? 'Stopped.',
-          );
+          finish(entry.killStatus ?? 'killed', null, entry.killReason ?? 'Stopped.');
           return;
         }
         if (result.code !== 0) {
           stream.finish();
-          emitExit(sink, stream, 'error', result.code, 'Compilation failed.');
+          finish('error', result.code, 'Compilation failed.');
           return;
         }
       }
@@ -303,9 +352,7 @@ export class LocalExecutionEngine implements ExecutionEngine {
       const runMs = Date.now() - runStartedAt;
 
       if (result.timedOut) {
-        emitExit(
-          sink,
-          stream,
+        finish(
           'timeout',
           null,
           `Took longer than ${config.exec.runTimeoutMs / 1000}s and was stopped.`,
@@ -314,21 +361,12 @@ export class LocalExecutionEngine implements ExecutionEngine {
         return;
       }
       if (entry.killed) {
-        emitExit(
-          sink,
-          stream,
-          entry.killStatus ?? 'killed',
-          null,
-          entry.killReason ?? 'Stopped.',
-          runMs,
-        );
+        finish(entry.killStatus ?? 'killed', null, entry.killReason ?? 'Stopped.', runMs);
         return;
       }
 
       const status: RunStatus = result.code === 0 ? 'success' : 'error';
-      emitExit(
-        sink,
-        stream,
+      finish(
         status,
         result.code,
         status === 'success' ? undefined : `Exited with code ${result.code}.`,
@@ -430,6 +468,19 @@ export class LocalExecutionEngine implements ExecutionEngine {
     entry.killStatus = status;
     entry.killReason = reason;
     if (entry.child) await killTree(entry.child);
+  }
+
+  /**
+   * Mirror the queue into the Prometheus gauges.
+   *
+   * Published when a run enters or leaves the queue rather than on a timer, so
+   * a scrape landing between two runs still sees the truth. `/metrics` and the
+   * runbook both refer to `codexa_queue_depth`; leaving it at zero forever
+   * would be worse than not publishing it at all.
+   */
+  private publishQueueGauges(): void {
+    queueDepth.set(this.queue.size);
+    activeRuns.set(this.queue.pending);
   }
 
   stats(): EngineStats {

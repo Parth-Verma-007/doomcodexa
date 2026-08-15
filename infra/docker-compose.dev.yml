@@ -1,9 +1,9 @@
 # Local development: Mongo only.
 #
-# The API deliberately runs on the host (`npm run dev`) rather than in a
-# container, because it needs to talk to the host's Docker daemon to spawn
-# runners. Sharing the daemon socket into a container is the worst version of
-# the risk documented in docs/SECURITY.md — so we don't do it, even locally.
+# The API runs on the host (`npm run dev`) rather than in a container, because
+# it spawns compilers as child processes and therefore needs the toolchains that
+# are installed on your machine. This file exists only to provide Mongo; use
+# `npm run db:local` instead if you would rather not run Docker at all.
 
 name: codexa-dev
 

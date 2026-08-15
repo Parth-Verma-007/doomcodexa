@@ -185,8 +185,10 @@ Two things have been verified by driving the real app, not just by unit tests:
   machine with only a JDK: Java compiles, runs, reads stdin and exits 0, while
   C++ and Python report exactly which package is missing.
 
-The **Docker** path is still unproven on the development machine used to build
-it — that host cannot run Docker at all (hardware virtualisation is disabled in
-firmware). `runners/smoke-test.sh` in CI is what covers it.
+Execution has no container path at all any more — Docker was removed rather
+than carried as an option, because the machine this was built on cannot run it
+(hardware virtualisation is disabled in firmware) and a managed container host
+will not hand a container the daemon socket. What that costs is stated in
+[docs/SECURITY.md §2](docs/SECURITY.md).
 
 See [docs/PLAN.md §16](docs/PLAN.md) for what remains.

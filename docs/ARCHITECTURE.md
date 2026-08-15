@@ -25,7 +25,7 @@ flowchart LR
     end
 
     subgraph E[Child processes]
-        K[throwaway container]
+        K[compile + run child processes]
     end
 
     Y <-->|binary updates| C --> D
@@ -73,16 +73,19 @@ resetting a pure debounce), flushed immediately when the last client leaves, and
 flushed again on shutdown — without that last one, a deploy silently discards up
 to two seconds of everyone's edits.
 
-### A PTY for every run
+### Compile and run are separate processes
 
-The single trick that makes interactive programs feel right. libc block-buffers
-stdout when it is a pipe, so `printf("Enter n: ")` before a `scanf` produces
-nothing until exit. Allocating a PTY (`Tty: true`) makes it line-buffer.
+This is what makes interactive programs work without a PTY. Each phase gets its
+own process with its own pipes, so compiler diagnostics and program output are
+never mixed and there is nothing to disambiguate — the earlier container design
+needed a per-run random sentinel printed between the phases precisely because a
+PTY merged the two streams into one.
 
-The cost is that a PTY merges stdout and stderr into one stream. So the runner
-script prints a **per-run random sentinel** after compiling: everything before it
-is compiler diagnostics, everything after is program output. The sentinel is 16
-random bytes, so a program cannot forge the transition.
+What a PTY did buy was line buffering: libc block-buffers stdout when it is a
+pipe, so `printf("Enter n: ")` before a `scanf` can sit in the buffer. Python
+is launched with `-u` to defeat that. C and C++ programs that prompt without a
+trailing newline may still show the prompt late — an accepted limitation, noted
+here rather than papered over.
 
 ### Output is batched at 30ms and capped at 1 MB
 
@@ -147,9 +150,10 @@ at create time**, and every run needs a different workspace directory. Reusing a
 container that had already executed user code would also violate the rule that
 no container runs two users' code.
 
-Dropped in favour of creating per run and keeping images resident. The engine
-verifies all four images exist at boot, so a missing image is a clear startup log
-line rather than a Run button that silently does nothing.
+Dropped — and later the containers went too. The engine now probes for each
+language's toolchain at boot and logs what it found, so a missing compiler is a
+clear startup line and a named error when you press Run, rather than a button
+that silently does nothing.
 
 ### Forcing a `monaco` chunk put Monaco back on the landing page
 

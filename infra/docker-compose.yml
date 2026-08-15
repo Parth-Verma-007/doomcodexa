@@ -1,9 +1,9 @@
 # Production stack for the single VPS (§15).
 #
 # NOTE: the API is intentionally NOT in this file. It runs on the host under
-# systemd (see infra/codexa-api.service) so that the Docker daemon socket is
-# never mounted into a container. Compose here owns the stateful and edge
-# pieces only: Mongo and Caddy.
+# systemd (see infra/codexa-api.service) so that it can spawn compilers as child
+# processes, using the toolchains installed on the host. Compose here owns the
+# stateful and edge pieces only: Mongo and Caddy.
 
 name: codexa
 

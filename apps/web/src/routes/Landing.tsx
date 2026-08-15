@@ -159,11 +159,12 @@ function Hero() {
 }
 
 /**
- * A still of the product, drawn in markup rather than shipped as a screenshot.
+ * The product, drawn in markup rather than shipped as screenshots.
  *
- * It stays sharp at any density, follows the theme, weighs nothing, and cannot
- * go stale when the real UI changes — and the two cursors communicate the whole
- * pitch faster than the paragraph above it.
+ * Four faces of a rotating prism, one per language, each an editor and its run
+ * output. Markup rather than images means it stays sharp at any density,
+ * follows the theme, weighs nothing, and cannot go stale when the real UI
+ * changes.
  */
 function EditorPreview() {
   return (
@@ -183,12 +184,15 @@ function Features() {
     {
       icon: <Terminal size={18} />,
       title: 'Programs that read input',
-      body: 'Each run gets a real terminal with a PTY. scanf, Scanner and input() behave exactly as they do on your machine, prompts included.',
+      body: 'Keystrokes go straight to the running program, so scanf, Scanner and input() block and read the way they do in your own terminal.',
     },
     {
       icon: <ShieldCheck size={18} />,
-      title: 'Sandboxed execution',
-      body: 'Every run happens in a throwaway container with no network, no privileges, and hard memory, CPU and time limits.',
+      // Deliberately not called "sandboxed". Runs are child processes of the
+      // API, so there is no container and no network isolation — claiming
+      // otherwise on the landing page would be a false security claim.
+      title: 'Bounded execution',
+      body: 'Every run gets a fresh scratch workspace, a wall-clock limit, a killed process tree and an output cap — then cleans up after itself.',
     },
     {
       icon: <Zap size={18} />,
