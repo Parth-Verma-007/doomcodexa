@@ -12,8 +12,14 @@ test('the landing page renders and offers a way in', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Code together');
   await expect(page.getByRole('link', { name: /sign in|dashboard/i }).first()).toBeVisible();
 
+  // Assert against the carousel's controls, not its faces. It is a rotating
+  // prism showing one language at a time, with an `sr-only` live region naming
+  // the current one — so a bare text match for "C" hits both the face and the
+  // announcer, and only one language is ever on screen anyway. The controls are
+  // always present and uniquely labelled.
+  // `exact` matters: without it "Show C" also matches "Show C++".
   for (const language of ['C', 'C++', 'Java', 'Python']) {
-    await expect(page.getByText(language, { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: `Show ${language}`, exact: true })).toBeVisible();
   }
 });
 
