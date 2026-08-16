@@ -19,8 +19,7 @@ beforeAll(async () => {
   app = createApp();
 });
 
-const signUp = (body: Record<string, unknown>) =>
-  request(app).post('/api/auth/signup').send(body);
+const signUp = (body: Record<string, unknown>) => request(app).post('/api/auth/signup').send(body);
 
 const logIn = (body: Record<string, unknown>) => request(app).post('/api/auth/login').send(body);
 
@@ -33,10 +32,7 @@ describe('sign-up', () => {
     expect(res.body.user.username).toBe('ada');
     expect(res.body.token).toEqual(expect.any(String));
 
-    await request(app)
-      .get('/api/me')
-      .set('Authorization', `Bearer ${res.body.token}`)
-      .expect(200);
+    await request(app).get('/api/me').set('Authorization', `Bearer ${res.body.token}`).expect(200);
   });
 
   it('never returns the password or its hash', async () => {
@@ -50,7 +46,9 @@ describe('sign-up', () => {
 
   it('rejects a duplicate email regardless of case', async () => {
     await signUp(ACCOUNT).expect(201);
-    const res = await signUp({ ...ACCOUNT, username: 'ada2', email: 'ADA@codexa.test' }).expect(409);
+    const res = await signUp({ ...ACCOUNT, username: 'ada2', email: 'ADA@codexa.test' }).expect(
+      409,
+    );
 
     expect(res.body.error.code).toBe('conflict');
   });
@@ -189,9 +187,13 @@ describe('password storage', () => {
     const { verifyPassword } = await import('./password.js');
     const huge = Buffer.alloc(64 * 1024, 7).toString('base64url');
 
-    await expect(verifyPassword('anything', `scrypt$16384$8$1$c2FsdA$${huge}`)).resolves.toBe(false);
+    await expect(verifyPassword('anything', `scrypt$16384$8$1$c2FsdA$${huge}`)).resolves.toBe(
+      false,
+    );
     // And the cost parameters themselves stay bounded.
-    await expect(verifyPassword('anything', 'scrypt$999999999$8$1$c2FsdA$aGk')).resolves.toBe(false);
+    await expect(verifyPassword('anything', 'scrypt$999999999$8$1$c2FsdA$aGk')).resolves.toBe(
+      false,
+    );
     await expect(verifyPassword('anything', 'not-a-hash')).resolves.toBe(false);
     await expect(verifyPassword('anything', '')).resolves.toBe(false);
   });

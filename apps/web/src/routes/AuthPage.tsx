@@ -53,7 +53,9 @@ export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
       navigate(redirect, { replace: true });
     } catch (err) {
       setError(
-        err instanceof ApiError ? err.message : 'Could not reach the server. Try again in a moment.',
+        err instanceof ApiError
+          ? err.message
+          : 'Could not reach the server. Try again in a moment.',
       );
     } finally {
       setBusy(false);

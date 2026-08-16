@@ -1,0 +1,56 @@
+# Render blueprint for the Codexa API.
+#
+# The web app is on Vercel; this is the other half. It cannot be on Vercel too,
+# and not for want of configuration: the API holds WebSocket connections open,
+# keeps the authoritative Y.Doc for each open file in memory, and spawns gcc,
+# g++, javac and python3 as child processes. A function that ends when its
+# request does can do none of those things.
+#
+# To use it: Render → New → Blueprint → point at this repository. Render reads
+# this file, builds apps/api/Dockerfile (which installs the four toolchains),
+# and asks for the three values marked `sync: false`.
+#
+# The free plan sleeps after 15 minutes of inactivity, so the first request
+# after a quiet spell waits for a cold start. Everything else works, WebSockets
+# included.
+
+services:
+  - type: web
+    name: codexa-api
+    runtime: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    # The build needs the whole workspace: the API imports @codexa/shared, and
+    # npm ci resolves from the root lockfile.
+    dockerContext: .
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      # Your MongoDB Atlas connection string. Create a free M0 cluster, add a
+      # database user, and allow access from anywhere (0.0.0.0/0) — Render's
+      # free plan has no static outbound address to allow-list instead.
+      # Remember to put the database name on the end: .../codexa
+      - key: MONGODB_URI
+        sync: false
+
+      # Exact origin of the Vercel deployment, scheme included and no trailing
+      # slash, e.g. https://codexa-partho007.vercel.app
+      # Anything not listed here is refused by CORS.
+      - key: CORS_ORIGINS
+        sync: false
+
+      # The API refuses to boot in production without this. It guards /metrics,
+      # which is otherwise a public description of your instance.
+      - key: METRICS_PASSWORD
+        generateValue: true
+
+      # Comma-separated emails that may open /admin. Leave blank and nobody can
+      # — the route answers 404 for everyone. Note that sign-up does not verify
+      # email addresses, so an address listed here but not yet registered is an
+      # admin slot open to whoever claims it first.
+      - key: ADMIN_EMAILS
+        sync: false
