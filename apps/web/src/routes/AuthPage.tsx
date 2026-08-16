@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { Code2 } from 'lucide-react';
 import { signInSchema, signUpSchema } from '@codexa/shared';
 import { useAuthActions, useAuthState } from '../lib/auth.js';
 import { ApiError } from '../lib/api.js';
 import { Button } from '../components/Button.js';
+import { Logo } from '../components/Logo.js';
 import { GridMesh } from '../components/decor/GridMesh.js';
 
 /**
@@ -70,7 +70,7 @@ export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
 
       <div className="relative w-full max-w-sm">
         <Link to="/" className="mb-8 flex items-center justify-center gap-2 text-ink">
-          <Code2 size={20} className="text-accent" />
+          <Logo size={20} />
           <span className="text-lg font-semibold tracking-tight">Codexa</span>
         </Link>
 

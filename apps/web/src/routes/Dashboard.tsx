@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { UserMenu } from '../components/UserMenu.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Code2, FolderPlus, Link2, Plus, Share2, ShieldCheck, Trash2, Users } from 'lucide-react';
+import { FolderPlus, Link2, Plus, Share2, ShieldCheck, Trash2, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { LANGUAGE_LIST, type LanguageId, type ProjectDto } from '@codexa/shared';
 import { api, ApiError } from '../lib/api.js';
 import { Button } from '../components/Button.js';
 import { Dialog } from '../components/Dialog.js';
+import { Logo } from '../components/Logo.js';
 import { ThemeToggle } from '../components/ThemeToggle.js';
 import { Spinner } from '../components/Spinner.js';
 import { Avatar } from '../components/Avatar.js';
@@ -55,7 +56,7 @@ export function Dashboard() {
         <header className="sticky top-0 z-20 border-b border-border/70 bg-surface-0/80 backdrop-blur-md">
           <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
             <Link to="/" className="flex items-center gap-2 font-semibold">
-              <Code2 size={18} className="text-accent" />
+              <Logo size={18} />
               Codexa
             </Link>
             <div className="flex items-center gap-3">

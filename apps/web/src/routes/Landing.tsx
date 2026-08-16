@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom';
-import { Code2, Play, ShieldCheck, Terminal, Users, Zap } from 'lucide-react';
+import { Play, ShieldCheck, Terminal, Users, Zap } from 'lucide-react';
 import { LANGUAGE_LIST } from '@codexa/shared';
 import { SignedIn, SignedOut } from '../lib/auth.js';
 import { Button } from '../components/Button.js';
+import { Logo } from '../components/Logo.js';
 import { StarButton } from '../components/StarButton.js';
 import { ThemeToggle } from '../components/ThemeToggle.js';
 import { ArrowRevealButton } from '../components/ArrowRevealButton.js';
@@ -44,7 +45,7 @@ export function Landing() {
           <div className="codexa-rule mb-6" />
           <div className="flex flex-col items-center justify-between gap-3 text-sm text-ink-faint sm:flex-row">
             <span className="flex items-center gap-2">
-              <Code2 size={15} className="text-accent" />
+              <Logo size={15} />
               Codexa — a collaborative IDE.
             </span>
             <span>C · C++ · Java · Python</span>
@@ -61,7 +62,7 @@ function Header() {
       <div className="mx-auto max-w-6xl px-6 py-4">
         <div className="codexa-glass flex items-center justify-between rounded-xl px-4 py-2.5">
           <span className="flex items-center gap-2 font-semibold">
-            <Code2 size={18} className="text-accent" />
+            <Logo size={18} />
             Codexa
           </span>
           <nav className="flex items-center gap-2">
@@ -95,14 +96,6 @@ function Header() {
 function Hero() {
   return (
     <section className="py-20 text-center sm:py-28">
-      <span className="codexa-glass mb-6 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs text-ink-muted">
-        <span className="relative flex size-1.5">
-          <span className="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-70" />
-          <span className="relative inline-flex size-1.5 rounded-full bg-success" />
-        </span>
-        Conflict-free editing, powered by a CRDT
-      </span>
-
       {/*
         Two texts, one heading. Each line is its own block and scrambles in as
         its own wave, so the break is deliberate rather than whatever the line

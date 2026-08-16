@@ -4,7 +4,6 @@ import { UserMenu } from '../components/UserMenu.js';
 import { useQuery } from '@tanstack/react-query';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import {
-  Code2,
   Files,
   History,
   MessageSquare,
@@ -36,6 +35,7 @@ import { useUiStore } from '../stores/uiStore.js';
 import { useRunStore, isRunActive } from '../stores/runStore.js';
 import { Spinner } from '../components/Spinner.js';
 import { Button } from '../components/Button.js';
+import { Logo } from '../components/Logo.js';
 import { GridMesh } from '../components/decor/GridMesh.js';
 import { FramedPanel } from '../components/decor/FramedPanel.js';
 import { cn } from '../lib/utils.js';
@@ -259,7 +259,7 @@ function Toolbar() {
   return (
     <header className="flex shrink-0 items-center gap-3 border-b border-border bg-surface-1 px-3 py-2">
       <Link to="/dashboard" className="flex items-center gap-1.5 text-sm font-semibold">
-        <Code2 size={16} className="text-accent" />
+        <Logo size={16} />
         <span className="hidden sm:inline">Codexa</span>
       </Link>
 
