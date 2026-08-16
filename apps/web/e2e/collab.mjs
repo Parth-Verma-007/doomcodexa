@@ -8,9 +8,9 @@
  *
  *   node e2e/collab.mjs [baseUrl]
  *
- * Each context gets its own identity via `?as=`, which the dev auth bypass
- * turns into a distinct user — that is what makes two "people" possible in one
- * machine's browser.
+ * Each context signs up as its own account. A browser context is a separate
+ * storage jar, so the two sessions never see each other — which is what makes
+ * two "people" possible on one machine.
  */
 import { chromium } from '@playwright/test';
 
@@ -23,11 +23,9 @@ const check = (label, ok, detail = '') => {
   if (!ok) failures.push(label);
 };
 
-/**
- * A browser context is a separate cookie and storage jar, so this really is a
- * second person — the identity itself is chosen by the `?as=` on first
- * navigation, which the app then keeps in that context's sessionStorage.
- */
+/** Unique per run, so repeated runs do not collide on the unique username. */
+const stamp = process.hrtime.bigint().toString(36).slice(-8);
+
 async function openContext() {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const page = await context.newPage();
@@ -36,12 +34,34 @@ async function openContext() {
   return { context, page, errors };
 }
 
+/**
+ * Register through the real form.
+ *
+ * Seeding a token into storage would be faster, but it would also stop this
+ * from covering sign-up — and the sign-up path is now load-bearing for the
+ * share-link flow, since anyone following a link needs an account first.
+ */
+async function signUp({ page }, handle) {
+  const username = `${handle}${stamp}`;
+  await page.goto(`${base}/sign-up`, { waitUntil: 'networkidle' });
+  await page.getByLabel('Email').fill(`${username}@codexa.test`);
+  await page.getByLabel('Username').fill(username);
+  await page.getByLabel('Password').fill('e2e-password-please');
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await page.waitForURL(/\/dashboard/, { timeout: 30_000 });
+  return username;
+}
+
 const alice = await openContext();
 const bob = await openContext();
 
+const aliceName = await signUp(alice, 'alice');
+const bobName = await signUp(bob, 'bob');
+check('Both people can register', Boolean(aliceName && bobName), `${aliceName}, ${bobName}`);
+
 // ─── Alice creates a project ──────────────────────────────────────────────────
 
-await alice.page.goto(`${base}/dashboard?as=alice`, { waitUntil: 'networkidle' });
+await alice.page.goto(`${base}/dashboard`, { waitUntil: 'networkidle' });
 await alice.page.getByRole('button', { name: 'New project' }).first().click();
 await alice.page.getByLabel('Name').fill('Pair session');
 await alice.page.getByRole('button', { name: 'Create' }).click();
@@ -75,7 +95,7 @@ check(
 await alice.page.keyboard.press('Escape');
 
 const joinUrl = new URL(shareLink);
-await bob.page.goto(`${base}${joinUrl.pathname}${joinUrl.search}&as=bob`, {
+await bob.page.goto(`${base}${joinUrl.pathname}${joinUrl.search}`, {
   waitUntil: 'networkidle',
 });
 await bob.page.waitForURL(/\/p\//, { timeout: 30_000 });

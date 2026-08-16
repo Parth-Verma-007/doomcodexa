@@ -7,10 +7,8 @@ import { config } from './config.js';
 import { logger } from './observability/logger.js';
 import { httpDuration, httpRequests } from './observability/metrics.js';
 import { errorHandler, notFoundHandler } from './http/errors.js';
-import { clerkAuthMiddleware } from './auth/clerk.js';
 import { healthRouter } from './http/routes/health.js';
 import { apiRouter } from './http/routes/index.js';
-import { webhookRouter } from './http/routes/webhooks.js';
 
 export function createApp(): Express {
   const app = express();
@@ -63,12 +61,7 @@ export function createApp(): Express {
 
   app.use(healthRouter);
 
-  // Mounted before the JSON body parser: svix verifies a signature over the
-  // exact raw bytes, so this router needs the unparsed body.
-  app.use('/api/webhooks', webhookRouter);
-
   app.use(express.json({ limit: '2mb' }));
-  app.use(clerkAuthMiddleware());
   app.use('/api', apiRouter);
 
   app.use(notFoundHandler);

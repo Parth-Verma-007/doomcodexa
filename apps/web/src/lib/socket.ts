@@ -1,25 +1,20 @@
 import { io, type Socket } from 'socket.io-client';
 import { NS } from '@codexa/shared';
 import { env } from './env.js';
+import { getToken } from './session.js';
 
 /**
  * Socket connection management.
  *
- * The important part is token refresh. Clerk session tokens live about a
- * minute; when one expires mid-session the handshake fails and a naive client
- * either gives up or reconnect-loops forever. The server distinguishes
- * `token_expired` from `invalid_token`, and this module reacts by fetching a
- * fresh token and reconnecting — which is why a Codexa tab left open over lunch
- * still works.
+ * The token is read at every connection attempt rather than captured once, so a
+ * reconnect after a long idle presents whatever is current — including a token
+ * from a sign-in that happened after this socket was created.
+ *
+ * Sessions last thirty days, so the old expiry-refresh dance is gone. What
+ * remains is the distinction the server still draws: a handshake refused for a
+ * missing or dead session should not be retried in a loop, because retrying
+ * with the same dead token cannot succeed.
  */
-
-type TokenGetter = () => Promise<string | null>;
-
-let getToken: TokenGetter = async () => null;
-
-export function registerSocketTokenGetter(getter: TokenGetter): void {
-  getToken = getter;
-}
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting' | 'offline';
 
@@ -57,13 +52,9 @@ export function getSocket(namespace: string): Socket {
     reconnection: true,
     reconnectionDelay: 500,
     reconnectionDelayMax: 5_000,
-    // The token is fetched fresh on every connection attempt, so a reconnect
-    // after a long idle never presents a stale one.
-    auth: (callback) => {
-      void getToken()
-        .then((token) => callback({ token: token ?? '' }))
-        .catch(() => callback({ token: '' }));
-    },
+    // Read fresh on every connection attempt, so a reconnect never presents a
+    // token from before the last sign-in.
+    auth: (callback) => callback({ token: getToken() ?? '' }),
   });
 
   socket.on('connect', () => setStatus('connected'));
@@ -77,13 +68,11 @@ export function getSocket(namespace: string): Socket {
 
   socket.on('connect_error', (err: Error & { data?: { reason?: string } }) => {
     const reason = err.data?.reason;
-    if (reason === 'token_expired' || reason === 'missing_token') {
-      // Expected: fetch a new token and try again immediately rather than
-      // waiting out the backoff or bouncing the user to sign-in.
-      void getToken().then(() => {
-        if (!socket.connected) socket.connect();
-      });
-      setStatus('reconnecting');
+    if (reason === 'missing_token' || reason === 'invalid_token') {
+      // The session is gone. Retrying presents the same dead token, so stop and
+      // let the UI show a disconnected state rather than spin forever.
+      setStatus('offline');
+      socket.disconnect();
       return;
     }
     setStatus('offline');

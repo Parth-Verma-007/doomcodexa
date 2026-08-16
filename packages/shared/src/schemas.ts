@@ -126,3 +126,45 @@ export const paginationSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(25),
   before: z.string().datetime().optional(),
 });
+
+// ─── Accounts ─────────────────────────────────────────────────────────────────
+
+/**
+ * Sign-up and sign-in validation, shared so the forms reject exactly what the
+ * API would. The rules are deliberately unfussy: composition requirements
+ * ("one uppercase, one symbol") push people towards `Password1!` and buy
+ * almost nothing, whereas length is what actually costs an attacker.
+ */
+
+export const emailSchema = z.string().trim().toLowerCase().email().max(200);
+
+export const usernameSchema = z
+  .string()
+  .trim()
+  .min(3, 'At least 3 characters.')
+  .max(32, 'At most 32 characters.')
+  .regex(
+    /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/,
+    'Letters, numbers, dots, dashes and underscores, starting with a letter or number.',
+  );
+
+export const passwordSchema = z
+  .string()
+  .min(8, 'At least 8 characters.')
+  // bcrypt-style truncation surprises do not apply to scrypt, but an unbounded
+  // password is an unbounded amount of hashing work per login attempt.
+  .max(200, 'At most 200 characters.');
+
+export const signUpSchema = z.object({
+  email: emailSchema,
+  username: usernameSchema,
+  password: passwordSchema,
+});
+export type SignUpInput = z.infer<typeof signUpSchema>;
+
+export const signInSchema = z.object({
+  /** Email or username — people remember one or the other, not which we wanted. */
+  identifier: z.string().trim().min(1, 'Enter your email or username.').max(200),
+  password: z.string().min(1, 'Enter your password.').max(200),
+});
+export type SignInInput = z.infer<typeof signInSchema>;

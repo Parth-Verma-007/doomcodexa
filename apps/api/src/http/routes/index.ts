@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { adminRouter } from './admin.js';
+import { authRouter } from './auth.js';
 import { meRouter } from './me.js';
 import { projectsRouter } from './projects.js';
 import { filesRouter, projectFilesRouter } from './files.js';
@@ -21,6 +22,8 @@ apiRouter.use(
   }),
 );
 
+// The only routes that do not require a session — and the only ones that mint one.
+apiRouter.use('/auth', authRouter);
 apiRouter.use('/me', meRouter);
 // Read-only, and 404s for anyone not in ADMIN_EMAILS.
 apiRouter.use('/admin', adminRouter);

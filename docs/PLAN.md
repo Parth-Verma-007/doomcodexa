@@ -1,8 +1,16 @@
 # Codexa — Engineering Plan
 
-> **Historical.** This is the plan as written before implementation. One
-> decision changed: execution no longer uses Docker at all. See
-> [SECURITY.md §2](SECURITY.md) for what replaced it and what that costs.
+> **Historical.** This is the plan as written before implementation. Two
+> decisions changed since, and the text below is left as it was rather than
+> quietly corrected:
+>
+> - Execution no longer uses Docker at all. See
+>   [SECURITY.md §2](SECURITY.md) for what replaced it and what that costs.
+> - Authentication is Codexa's own — email or username and a password, scrypt
+>   hashes, opaque session tokens — rather than Clerk. So §10, the `clerkId`
+>   field in §6 and the `POST /webhooks/clerk` route in §11 describe an
+>   integration that is no longer there. [SECURITY.md §3](SECURITY.md)
+>   documents what replaced it.
 
 **A real-time collaborative web IDE for C, C++, Java, and Python.**
 

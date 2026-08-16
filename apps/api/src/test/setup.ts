@@ -17,7 +17,6 @@ let mongod: MongoMemoryServer | undefined;
 // that anything printed is a real signal.
 process.env.NODE_ENV = 'test';
 process.env.LOG_LEVEL = 'silent';
-process.env.AUTH_DEV_BYPASS = '1';
 process.env.EXEC_DISABLED = '1';
 
 beforeAll(async () => {

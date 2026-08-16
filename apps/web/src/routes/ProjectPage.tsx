@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { UserButton } from '../lib/auth.js';
+import { UserMenu } from '../components/UserMenu.js';
 import { useQuery } from '@tanstack/react-query';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import {
@@ -305,7 +305,7 @@ function Toolbar() {
           </Button>
         ) : null}
 
-        <UserButton />
+        <UserMenu />
       </div>
 
       {localProject ? (

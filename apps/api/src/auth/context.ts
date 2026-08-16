@@ -1,8 +1,7 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import { atLeast, type Role } from '@codexa/shared';
 import { ApiError } from '../http/errors.js';
-import { clerkIdFromRequest } from './clerk.js';
-import { resolveUser } from './users.js';
+import { resolveSession } from './sessions.js';
 import { Project, roleFor, type ProjectDoc, type UserDoc } from '../db/models/index.js';
 import { objectIdSchema } from '@codexa/shared';
 
@@ -24,12 +23,29 @@ declare module 'express-serve-static-core' {
   }
 }
 
-export const requireAuth: RequestHandler = (req, _res, next) => {
-  const clerkId = clerkIdFromRequest(req);
-  if (!clerkId) return next(ApiError.unauthorized());
+/**
+ * The session token on a request.
+ *
+ * `Authorization: Bearer <token>` only — no cookie. The client is a separate
+ * origin from the API and talks to it with `fetch` and a WebSocket, so an
+ * explicit header is both simpler and immune to CSRF: a browser will not attach
+ * it to a cross-site request the way it would a cookie.
+ */
+export function bearerToken(req: Request): string | undefined {
+  const header = req.get('authorization');
+  if (!header) return undefined;
 
-  resolveUser(clerkId)
+  const [scheme, ...rest] = header.split(' ');
+  if (scheme?.toLowerCase() !== 'bearer') return undefined;
+
+  const token = rest.join(' ').trim();
+  return token.length > 0 ? token : undefined;
+}
+
+export const requireAuth: RequestHandler = (req, _res, next) => {
+  resolveSession(bearerToken(req))
     .then((user) => {
+      if (!user) return next(ApiError.unauthorized());
       req.currentUser = user;
       next();
     })

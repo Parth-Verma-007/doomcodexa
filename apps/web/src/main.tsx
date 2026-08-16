@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App } from './App.js';
-import { AuthProvider } from './lib/auth.js';
+
 import './index.css';
 
 // Monaco is deliberately NOT imported here. It is ~4MB and is pulled in by the
@@ -30,16 +30,16 @@ const queryClient = new QueryClient({
 const root = document.getElementById('root');
 if (!root) throw new Error('#root is missing from index.html');
 
+// No auth provider: the session is read synchronously from storage, so there is
+// nothing to load and no context to thread through the tree.
 createRoot(root).render(
   <StrictMode>
-    <AuthProvider>
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          {/* The toaster lives inside <App> so it can follow the resolved
-              theme; Sonner needs light/dark told to it, not inherited. */}
-          <App />
-        </BrowserRouter>
-      </QueryClientProvider>
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        {/* The toaster lives inside <App> so it can follow the resolved
+            theme; Sonner needs light/dark told to it, not inherited. */}
+        <App />
+      </BrowserRouter>
+    </QueryClientProvider>
   </StrictMode>,
 );

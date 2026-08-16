@@ -402,7 +402,8 @@ export class LocalExecutionEngine implements ExecutionEngine {
         env: {
           PATH: process.env.PATH,
           // A stable, minimal environment: the program should not inherit the
-          // server's secrets (Mongo URI, Clerk keys) just because it is a child.
+          // server's secrets (the Mongo URI, ADMIN_EMAILS, the metrics
+          // password) just because it is a child.
           HOME: options.cwd,
           USERPROFILE: options.cwd,
           TEMP: options.cwd,

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { UserButton } from '../lib/auth.js';
+import { UserMenu } from '../components/UserMenu.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Code2, FolderPlus, Link2, Plus, Share2, ShieldCheck, Trash2, Users } from 'lucide-react';
 import { toast } from 'sonner';
@@ -75,7 +75,7 @@ export function Dashboard() {
                 <Plus size={15} />
                 New project
               </Button>
-              <UserButton />
+              <UserMenu />
             </div>
           </div>
         </header>

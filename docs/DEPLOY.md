@@ -33,22 +33,23 @@ unless that domain is in `CORS_ORIGINS`.
 
 ```bash
 # terminal 4
-AUTH_DEV_BYPASS=1 CORS_ORIGINS=https://<your-web-tunnel> npm run dev:api
+CORS_ORIGINS=https://<your-web-tunnel> npm run dev:api
 
-# terminal 5 — or put these two in apps/web/.env.local
-VITE_AUTH_DEV_BYPASS=1 VITE_API_URL=https://<your-api-tunnel> npm run dev:web
+# terminal 5 — or put this in apps/web/.env.local
+VITE_API_URL=https://<your-api-tunnel> npm run dev:web
 ```
 
 If the editor loads but never syncs, this is almost always why: open the browser
 console and look for a CORS error on the socket connection.
 
-Because Clerk is bypassed, everyone needs a distinct identity: append `?as=`
-to the URL you send. You open `…/dashboard?as=you`, they open
-`…/join?t=<token>&as=them`. The name sticks to their browser tab.
+Everyone signs up for their own account at `…/sign-up` — that is all the
+identity anyone needs, and the accounts live in your local database. If you want
+two identities on your own machine, use two browser profiles or an incognito
+window; the session is stored per profile, so two tabs are one person.
 
-**This is a demo mode, not a deployment.** Authentication is off, so anyone with
-the link is whoever they claim to be, and code runs unsandboxed on your laptop.
-Fine for people you know; not for a link you post publicly.
+**This is a session on your laptop, not a deployment.** Sign-in is real, but
+submitted code still runs unsandboxed as your own user, and the database is the
+one on your machine. Fine for people you know; not for a link you post publicly.
 
 ---
 
@@ -84,10 +85,11 @@ while this app is Mongoose throughout, so it is not a drop-in database either.
 access from anywhere (`0.0.0.0/0`) unless your API host publishes fixed egress
 IPs. Copy the connection string.
 
-**b. Auth.** Create a Clerk application. You need the publishable key for the
-web app and the secret key for the API. The webhook is optional — the API
-upserts a user on their first authenticated request and treats the webhook as
-an optimisation.
+**b. Auth.** Nothing to provision. Codexa issues its own credentials: accounts
+are rows in your database, passwords are scrypt hashes, and a session is a
+random token stored as its SHA-256. There is no key to set and no service to
+sign up for — which also means the accounts are yours to lose, so the backups in
+[RUNBOOK.md](RUNBOOK.md) matter more than they would otherwise.
 
 **c. API.** Point your host at `apps/api/Dockerfile` with the repository root as
 the build context. It is a complete image: Node, the compiled API, and `gcc`,
@@ -96,14 +98,12 @@ checks the toolchains on every push.
 
 Set:
 
-| Variable                | Value                                             |
-| ----------------------- | ------------------------------------------------- |
-| `NODE_ENV`              | `production`                                      |
-| `MONGODB_URI`           | your Atlas connection string                      |
-| `CLERK_SECRET_KEY`      | from Clerk                                        |
-| `CLERK_PUBLISHABLE_KEY` | from Clerk                                        |
-| `METRICS_PASSWORD`      | any long random string                            |
-| `CORS_ORIGINS`          | your Vercel URL, e.g. `https://codexa.vercel.app` |
+| Variable           | Value                                             |
+| ------------------ | ------------------------------------------------- |
+| `NODE_ENV`         | `production`                                      |
+| `MONGODB_URI`      | your Atlas connection string                      |
+| `METRICS_PASSWORD` | any long random string                            |
+| `CORS_ORIGINS`     | your Vercel URL, e.g. `https://codexa.vercel.app` |
 
 The image already sets `EXEC_LOCAL_ALLOW_UNSANDBOXED=1`. Read the warning below
 before leaving that on.
@@ -112,23 +112,22 @@ before leaving that on.
 repository root** — the web app depends on the `@codexa/shared` workspace, which
 must be built first, and `vercel.json` already encodes that. Set:
 
-| Variable                     | Value                 |
-| ---------------------------- | --------------------- |
-| `VITE_API_URL`               | your API's public URL |
-| `VITE_CLERK_PUBLISHABLE_KEY` | from Clerk            |
+| Variable       | Value                 |
+| -------------- | --------------------- |
+| `VITE_API_URL` | your API's public URL |
 
-Do **not** set `VITE_AUTH_DEV_BYPASS`. The build refuses to produce a bundle
-with it enabled, which is the intended behaviour.
+That is the only build-time variable the web app reads; the session it holds
+comes from the API at sign-in, not from configuration.
 
 **e. Close the loop.** Once Vercel gives you a domain, put it in `CORS_ORIGINS`
-on the API and redeploy the API. Add the same domain to Clerk's allowed origins.
+on the API and redeploy the API.
 
 ### Check it worked
 
 Open the site in two different browsers — or one normal and one private window,
-since they need separate sessions. Sign in as two different people, create a
-project in one, use **Share → Edit → Create a share link**, and open that link
-in the other. You should see their avatar appear in the header, their cursor
+since a session is stored per browser profile. Sign up as two different people,
+create a project in one, use **Share → Edit → Create a share link**, and open
+that link in the other. You should see their avatar appear in the header, their cursor
 with their name in the editor, and both of your edits merge as you type.
 
 That is precisely what `collab.mjs` asserts locally, so if it passes there and

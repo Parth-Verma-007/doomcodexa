@@ -1,7 +1,7 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import type { Express } from 'express';
-import { TEST_IDENTITY_HEADER } from '../../auth/clerk.js';
+import { authHeaders, mintIdentities } from '../../test/identities.js';
 
 /**
  * REST behaviour, with a real Mongo behind it (§14).
@@ -11,21 +11,27 @@ import { TEST_IDENTITY_HEADER } from '../../auth/clerk.js';
  * where an IDE with sharing actually goes wrong.
  */
 
-const OWNER = 'user_owner';
-const EDITOR = 'user_editor';
-const VIEWER = 'user_viewer';
-const STRANGER = 'user_stranger';
+const OWNER = 'owner';
+const EDITOR = 'editor';
+const VIEWER = 'viewer';
+const STRANGER = 'stranger';
+const IDENTITIES = [OWNER, EDITOR, VIEWER, STRANGER] as const;
 
 let app: Express;
 
 beforeAll(async () => {
-  process.env.AUTH_DEV_BYPASS = '1';
   process.env.EXEC_DISABLED = '1';
   const { createApp } = await import('../../app.js');
   app = createApp();
 });
 
-const as = (identity: string) => ({ [TEST_IDENTITY_HEADER]: identity });
+// The suite wipes every collection between tests, so the accounts have to be
+// re-created each time rather than once.
+beforeEach(async () => {
+  await mintIdentities(IDENTITIES);
+});
+
+const as = (identity: string) => authHeaders(identity);
 
 async function createProject(identity = OWNER, overrides: Record<string, unknown> = {}) {
   const res = await request(app)
@@ -471,10 +477,9 @@ describe('admin', () => {
   });
 
   it('gives away nothing about the route in its refusal', async () => {
-    // Not `401`: this suite runs with AUTH_DEV_BYPASS, so every request is
-    // authenticated as the dev identity and there is no unauthenticated state
-    // to observe. What matters here is that a non-admin's rejection is
-    // indistinguishable from a URL that does not exist.
+    // Both calls are authenticated, so the interesting comparison is a
+    // non-admin's rejection against a URL that genuinely does not exist — they
+    // must be indistinguishable.
     const admin = await request(app).get('/api/admin/overview').set(as(OWNER)).expect(404);
     const nonsense = await request(app).get('/api/admin/nope').set(as(OWNER)).expect(404);
 

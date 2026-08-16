@@ -35,10 +35,10 @@ jobs:
       - run: npm run typecheck
 
       # Includes the CRDT convergence test — the correctness heart of the app (§14).
+      # No auth configuration: the suite signs its fixtures up through the real
+      # routes, against an in-memory MongoDB.
       - name: Unit and integration tests
         run: npm test
-        env:
-          AUTH_DEV_BYPASS: '1'
 
   build:
     name: Build web and API
@@ -54,7 +54,6 @@ jobs:
       - run: npm run build
         env:
           VITE_API_URL: https://api.example.com
-          VITE_CLERK_PUBLISHABLE_KEY: pk_test_ci_placeholder
 
   api-image:
     name: API image
@@ -79,19 +78,17 @@ jobs:
       # route answers — that route deliberately does not touch Mongo.
       # NODE_ENV=development is not incidental. The image bakes in
       # NODE_ENV=production, and config.ts *deliberately* refuses to boot in
-      # production without Clerk keys, a metrics password, and with
-      # AUTH_DEV_BYPASS set — that refusal is a feature (docs/SECURITY.md §4.1).
-      # Without this override the container dies during module evaluation, and
-      # the loop below polls a corpse for sixty seconds. This job is checking
-      # that the image is well-formed and the toolchains are present, not that
-      # the production config gate works.
+      # production without METRICS_PASSWORD — that refusal is a feature
+      # (docs/SECURITY.md §7). Without this override the container dies during
+      # module evaluation, and the loop below polls a corpse for sixty seconds.
+      # This job is checking that the image is well-formed and the toolchains
+      # are present, not that the production config gate works.
       - name: Boot it and check liveness
         run: |
           docker run -d --name codexa-api -p 4000:4000 \
             -e NODE_ENV=development \
             -e EXEC_DISABLED=1 \
             -e MONGODB_URI=mongodb://127.0.0.1:27017/unused \
-            -e AUTH_DEV_BYPASS=1 \
             codexa-api:ci
           for i in $(seq 1 30); do
             if curl -fsS http://localhost:4000/health > /dev/null; then
@@ -138,4 +135,3 @@ jobs:
       - run: npm run test:e2e -w @codexa/web
         env:
           MONGODB_URI: mongodb://localhost:27017/codexa_e2e
-          AUTH_DEV_BYPASS: '1'

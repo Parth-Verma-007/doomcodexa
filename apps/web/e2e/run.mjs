@@ -28,7 +28,16 @@ const LABELS = { c: 'C', cpp: 'C++', java: 'Java', python: 'Python' };
 // Anchoring on the entrypoint keeps `main.c` from also matching `main.cpp`.
 const ENTRYPOINTS = { c: 'main.c', cpp: 'main.cpp', java: 'Main.java', python: 'main.py' };
 
-await page.goto(`${base}/dashboard?as=runner`, { waitUntil: 'networkidle' });
+// Register a throwaway account for this run. Unique per invocation, because
+// usernames are unique and this script is meant to be run repeatedly.
+const runner = `runner${process.hrtime.bigint().toString(36).slice(-8)}`;
+await page.goto(`${base}/sign-up`, { waitUntil: 'networkidle' });
+await page.getByLabel('Email').fill(`${runner}@codexa.test`);
+await page.getByLabel('Username').fill(runner);
+await page.getByLabel('Password').fill('e2e-password-please');
+await page.getByRole('button', { name: 'Create account' }).click();
+await page.waitForURL(/\/dashboard/, { timeout: 30_000 });
+
 await page.getByRole('button', { name: 'New project' }).first().click();
 await page.getByLabel('Name').fill(`Run ${language}`);
 await page

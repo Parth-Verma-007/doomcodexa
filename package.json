@@ -21,7 +21,8 @@
     "format": "prettier --write \"**/*.{ts,tsx,json,md,css}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,json,md,css}\"",
     "test": "npm run test --workspaces --if-present",
-    "db:local": "node scripts/local-mongo.mjs"
+    "db:local": "node scripts/local-mongo.mjs",
+    "seed": "node scripts/seed.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

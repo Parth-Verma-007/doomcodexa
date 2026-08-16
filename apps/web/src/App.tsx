@@ -1,13 +1,10 @@
 import { Suspense, lazy, useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { SignIn, SignUp } from '@clerk/clerk-react';
 import { Toaster } from 'sonner';
-import { SignedIn, SignedOut, useAuthState } from './lib/auth.js';
-import { env } from './lib/env.js';
-import { registerTokenGetter } from './lib/api.js';
-import { disconnectAll, registerSocketTokenGetter } from './lib/socket.js';
+import { useAuthState } from './lib/auth.js';
 import { useColorMode } from './stores/uiStore.js';
 import { Landing } from './routes/Landing.js';
+import { AuthPage } from './routes/AuthPage.js';
 import { Spinner } from './components/Spinner.js';
 
 // The IDE pulls in Monaco, xterm and Yjs — several megabytes that a visitor
@@ -27,7 +24,6 @@ const AdminPage = lazy(() =>
 );
 
 export function App() {
-  useClerkTokenBridge();
   useThemeClass();
   const mode = useColorMode();
 
@@ -65,8 +61,8 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
-      <Route path="/sign-in/*" element={<AuthScreen mode="sign-in" />} />
-      <Route path="/sign-up/*" element={<AuthScreen mode="sign-up" />} />
+      <Route path="/sign-in" element={<AuthPage mode="sign-in" />} />
+      <Route path="/sign-up" element={<AuthPage mode="sign-up" />} />
       <Route
         path="/dashboard"
         element={
@@ -105,40 +101,13 @@ function AppRoutes() {
 }
 
 /**
- * Everything that needs Clerk's token lives above the routes, so the bridge
- * and theme hooks stay in the eager bundle while the routes themselves split.
- */
-
-/**
- * Hands Clerk's token getter to the two non-React modules that need it.
- *
- * Doing this in a hook rather than importing `useAuth` inside those modules is
- * what lets the socket manager fetch a *fresh* token on every reconnect
- * attempt, which is the whole mechanism behind surviving token expiry.
- */
-function useClerkTokenBridge(): void {
-  const { getToken, isSignedIn, isLoaded } = useAuthState();
-
-  useEffect(() => {
-    registerTokenGetter(() => getToken());
-    registerSocketTokenGetter(() => getToken());
-  }, [getToken]);
-
-  useEffect(() => {
-    // Signing out must drop the sockets, or the next user inherits rooms they
-    // are not a member of until the server times the connection out.
-    if (isLoaded && !isSignedIn) disconnectAll();
-  }, [isLoaded, isSignedIn]);
-}
-
-/**
  * Publishes the resolved theme — `dark` or `light`, nothing else — to <html>
  * for the CSS token blocks.
  *
  * The inline script in index.html does this first, before paint, from the same
- * persisted key; this hook only keeps it in step afterwards. The classes are
- * kept alongside `data-theme` because embedded third-party widgets (Clerk's,
- * for one) look for `.light`/`.dark`, not our attribute.
+ * persisted key; this hook only keeps it in step afterwards. The `.light` and
+ * `.dark` classes are kept alongside `data-theme` because Tailwind's `dark:`
+ * variant and any third-party CSS look for a class, not our attribute.
  */
 function useThemeClass(): void {
   const mode = useColorMode();
@@ -170,28 +139,4 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   }
 
   return <>{children}</>;
-}
-
-function AuthScreen({ mode }: { mode: 'sign-in' | 'sign-up' }) {
-  const params = new URLSearchParams(useLocation().search);
-  const redirect = params.get('redirect_url') ?? '/dashboard';
-
-  // With Clerk bypassed there is nothing to sign in to, and rendering <SignIn>
-  // would crash on the missing publishable key.
-  if (env.devBypass) return <Navigate to={redirect} replace />;
-
-  return (
-    <div className="flex h-full items-center justify-center bg-surface-0 p-6">
-      <SignedOut>
-        {mode === 'sign-in' ? (
-          <SignIn routing="path" path="/sign-in" signUpUrl="/sign-up" forceRedirectUrl={redirect} />
-        ) : (
-          <SignUp routing="path" path="/sign-up" signInUrl="/sign-in" forceRedirectUrl={redirect} />
-        )}
-      </SignedOut>
-      <SignedIn>
-        <Navigate to={redirect} replace />
-      </SignedIn>
-    </div>
-  );
 }

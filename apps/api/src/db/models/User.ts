@@ -2,9 +2,12 @@ import { Schema, model, type HydratedDocument, type InferSchemaType } from 'mong
 import type { UserDto } from '@codexa/shared';
 
 /**
- * A mirror of the Clerk user, kept in sync by the `user.*` webhook (§10).
- * Clerk is the source of truth for identity; this collection exists so that
- * every other document can hold a stable ObjectId reference.
+ * An account.
+ *
+ * This used to be a mirror of a Clerk user, kept in sync by a webhook. Codexa
+ * now owns identity outright: `email` and `username` are the natural keys and
+ * `passwordHash` is the credential. Nothing else in the app changed, because
+ * every other document already referenced users by ObjectId.
  */
 
 /** Presence colours. Chosen for contrast against both editor themes. */
@@ -33,9 +36,18 @@ const preferencesSchema = new Schema(
 
 const userSchema = new Schema(
   {
-    clerkId: { type: String, required: true, unique: true, index: true },
-    email: { type: String, required: true },
-    username: { type: String, required: true },
+    email: { type: String, required: true, lowercase: true, trim: true },
+    /**
+     * Stored as typed for display, matched case-insensitively at sign-in and
+     * against the unique index via a collation — so "Parth" and "parth" cannot
+     * both be registered.
+     */
+    username: { type: String, required: true, trim: true },
+    /**
+     * `select: false`: a hash is not something any route should hand out by
+     * accident, and every read that needs it asks for it explicitly.
+     */
+    passwordHash: { type: String, required: true, select: false },
     avatarUrl: { type: String, default: null },
     color: { type: String, required: true },
     preferences: { type: preferencesSchema, default: () => ({}) },
@@ -44,19 +56,33 @@ const userSchema = new Schema(
   { timestamps: true },
 );
 
+/**
+ * Case-insensitive uniqueness for both natural keys.
+ *
+ * Declared here rather than as `unique: true` on the fields, because that would
+ * additionally create a plain index in which "Parth" and "parth" are distinct
+ * values — two indexes disagreeing about what uniqueness means. `strength: 2`
+ * compares letters but not case, which is what people expect of a login field.
+ * Queries must pass the same collation to use these indexes.
+ */
+export const CI = { locale: 'en', strength: 2 } as const;
+
+userSchema.index({ email: 1 }, { unique: true, collation: CI });
+userSchema.index({ username: 1 }, { unique: true, collation: CI });
+
 export type UserAttrs = InferSchemaType<typeof userSchema>;
 export type UserDoc = HydratedDocument<UserAttrs>;
 
 export const User = model('User', userSchema);
 
 /**
- * Deterministic colour assignment: the same Clerk id always gets the same
- * colour, so a user's cursor colour is stable across projects and re-signups.
+ * Deterministic colour assignment: the same email always gets the same colour,
+ * so a user's cursor colour is stable across projects and re-registrations.
  */
-export function colorForClerkId(clerkId: string): string {
+export function colorForKey(key: string): string {
   let hash = 0;
-  for (let i = 0; i < clerkId.length; i += 1) {
-    hash = (hash * 31 + clerkId.charCodeAt(i)) >>> 0;
+  for (let i = 0; i < key.length; i += 1) {
+    hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
   }
   return PRESENCE_COLORS[hash % PRESENCE_COLORS.length] as string;
 }

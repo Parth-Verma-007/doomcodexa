@@ -1,100 +1,82 @@
-import type { ReactNode } from 'react';
-import {
-  ClerkProvider,
-  SignedIn as ClerkSignedIn,
-  SignedOut as ClerkSignedOut,
-  UserButton as ClerkUserButton,
-  useAuth as useClerkAuth,
-} from '@clerk/clerk-react';
-import { env } from './env.js';
+import { useCallback, useSyncExternalStore, type ReactNode } from 'react';
+import type { SignInInput, SignUpInput, UserDto } from '@codexa/shared';
+import { api } from './api.js';
+import { disconnectAll } from './socket.js';
+import { getSession, setSession, subscribe } from './session.js';
 
 /**
- * A single seam over Clerk.
+ * Authentication, owned by Codexa.
  *
- * Every component imports auth from here rather than from `@clerk/clerk-react`,
- * so the dev bypass exists in exactly one place — the same discipline the API
- * uses in `auth/clerk.ts`. Without this the app hard-depends on a Clerk account
- * just to render, which made the project impossible to run from a fresh clone.
+ * This used to be a seam over Clerk with a development bypass behind it. The
+ * app now issues its own sessions, so there is one code path instead of two and
+ * nothing to accidentally leave switched on in production.
  *
- * In bypass mode the "session token" is simply the identity string. The API,
- * when its own bypass is on, treats a socket token exactly that way, so the two
- * sides agree on who you are with no shared secret.
+ * The shape of `useAuthState` is unchanged on purpose — the router, the REST
+ * client and the socket manager all consumed it and none of them had to care
+ * where a token comes from.
  */
 
 export interface AuthState {
+  /**
+   * Always true today — the session is read from storage synchronously before
+   * the first render, so there is no loading state. Kept because the router
+   * branches on it and a future token-refresh flow would reintroduce one.
+   */
   isLoaded: boolean;
   isSignedIn: boolean;
-  getToken: () => Promise<string | null>;
+  user: UserDto | null;
+  email: string | null;
 }
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  if (env.devBypass) return <>{children}</>;
-
-  return (
-    <ClerkProvider
-      publishableKey={env.clerkPublishableKey}
-      afterSignOutUrl="/"
-      appearance={{ variables: { colorPrimary: '#4c8dff' } }}
-    >
-      {children}
-    </ClerkProvider>
-  );
+function useStoredSession() {
+  return useSyncExternalStore(subscribe, getSession, () => null);
 }
-
-function useDevAuth(): AuthState {
-  return {
-    isLoaded: true,
-    isSignedIn: true,
-    getToken: async () => env.devUser,
-  };
-}
-
-function useRealAuth(): AuthState {
-  const { isLoaded, isSignedIn, getToken } = useClerkAuth();
-  return {
-    isLoaded,
-    isSignedIn: Boolean(isSignedIn),
-    getToken: () => getToken(),
-  };
-}
-
-/**
- * Two implementations behind one name.
- *
- * The choice is bound once at module scope rather than branched inside the
- * hook. `env.devBypass` is a build-time constant so either form behaves
- * identically at runtime, but selecting here keeps the call below
- * unconditional — which is what the rules of hooks actually require, and means
- * the linter is checking something real rather than being silenced.
- */
-const useAuthImplementation = env.devBypass ? useDevAuth : useRealAuth;
 
 export function useAuthState(): AuthState {
-  return useAuthImplementation();
+  const session = useStoredSession();
+
+  return {
+    isLoaded: true,
+    isSignedIn: session !== null,
+    user: session?.user ?? null,
+    email: session?.email ?? null,
+  };
 }
 
+/** Sign in, sign up and sign out. Separate from `useAuthState` because most
+ *  components only ever read. */
+export function useAuthActions() {
+  const signIn = useCallback(async (input: SignInInput) => {
+    setSession(await api.login(input));
+  }, []);
+
+  const signUp = useCallback(async (input: SignUpInput) => {
+    setSession(await api.signup(input));
+  }, []);
+
+  const signOut = useCallback(async () => {
+    try {
+      // Best effort: the server should forget the session too, but a network
+      // failure must not leave the user stuck signed in on this device.
+      await api.logout();
+    } catch {
+      /* ignore */
+    }
+    setSession(null);
+    // Sockets authenticate at handshake, so an open one outlives sign-out
+    // until something forces it closed.
+    disconnectAll();
+  }, []);
+
+  return { signIn, signUp, signOut };
+}
+
+/** Render only when signed in. */
 export function SignedIn({ children }: { children: ReactNode }) {
-  if (env.devBypass) return <>{children}</>;
-  return <ClerkSignedIn>{children}</ClerkSignedIn>;
+  return useStoredSession() ? <>{children}</> : null;
 }
 
+/** Render only when signed out. */
 export function SignedOut({ children }: { children: ReactNode }) {
-  if (env.devBypass) return null;
-  return <ClerkSignedOut>{children}</ClerkSignedOut>;
-}
-
-export function UserButton() {
-  if (!env.devBypass) return <ClerkUserButton afterSignOutUrl="/" />;
-
-  // A visible, deliberately unpolished marker: you should never mistake a
-  // bypassed session for a real one.
-  return (
-    <span
-      title="Authentication is bypassed (VITE_AUTH_DEV_BYPASS=1)"
-      className="flex items-center gap-1.5 rounded-full border border-warning/40 bg-warning/10 px-2 py-1 text-[11px] font-medium text-warning"
-    >
-      <span className="size-1.5 rounded-full bg-warning" aria-hidden />
-      {env.devUser}
-    </span>
-  );
+  return useStoredSession() ? null : <>{children}</>;
 }

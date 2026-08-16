@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createServer, type Server as HttpServer } from 'node:http';
 import { io as connect, type Socket as ClientSocket } from 'socket.io-client';
 import type { Server as IoServer } from 'socket.io';
@@ -6,7 +6,7 @@ import * as Y from 'yjs';
 import request from 'supertest';
 import type { Express } from 'express';
 import { NS } from '@codexa/shared';
-import { TEST_IDENTITY_HEADER } from '../auth/clerk.js';
+import { authHeaders, mintIdentities, tokenFor } from '../test/identities.js';
 
 /**
  * Socket-level integration (§14): two real clients, one real server.
@@ -16,8 +16,9 @@ import { TEST_IDENTITY_HEADER } from '../auth/clerk.js';
  * server drops it and the other client never sees the edit.
  */
 
-const OWNER = 'user_sock_owner';
-const VIEWER = 'user_sock_viewer';
+const OWNER = 'sockowner';
+const VIEWER = 'sockviewer';
+const STRANGER = 'sockstranger';
 
 let app: Express;
 let httpServer: HttpServer;
@@ -37,6 +38,12 @@ beforeAll(async () => {
   port = (httpServer.address() as { port: number }).port;
 });
 
+// Collections are wiped between tests, so the accounts and their sessions have
+// to be minted fresh for each one.
+beforeEach(async () => {
+  await mintIdentities([OWNER, VIEWER, STRANGER]);
+});
+
 afterEach(() => {
   while (clients.length > 0) clients.pop()?.disconnect();
 });
@@ -46,10 +53,14 @@ afterAll(async () => {
   await new Promise<void>((resolve) => httpServer.close(() => resolve()));
 });
 
-/** With Clerk disabled the handshake token is simply the identity to assume. */
+/** The handshake carries the same session token REST uses. */
 function openSocket(namespace: string, identity: string): Promise<ClientSocket> {
+  return openSocketWithToken(namespace, tokenFor(identity));
+}
+
+function openSocketWithToken(namespace: string, token: string | undefined): Promise<ClientSocket> {
   const socket = connect(`http://127.0.0.1:${port}${namespace}`, {
-    auth: { token: identity },
+    auth: { token },
     transports: ['websocket'],
     forceNew: true,
   });
@@ -99,7 +110,7 @@ function expectNoEvent(socket: ClientSocket, event: string, withinMs = 400): Pro
   });
 }
 
-const as = (identity: string) => ({ [TEST_IDENTITY_HEADER]: identity });
+const as = (identity: string) => authHeaders(identity);
 
 async function seedProject() {
   const created = await request(app)
@@ -126,11 +137,22 @@ async function seedProject() {
 }
 
 describe('authentication', () => {
-  it('rejects a connection with no identity when Clerk is enabled', async () => {
-    // Clerk is disabled here, so instead assert the handshake succeeds and the
-    // socket is bound to the fallback dev identity rather than being anonymous.
-    const socket = await openSocket(NS.collab, '');
-    expect(socket.connected).toBe(true);
+  it('refuses a handshake with no token', async () => {
+    await expect(openSocketWithToken(NS.collab, undefined)).rejects.toThrow();
+  });
+
+  it('refuses a handshake with a token that is not a session', async () => {
+    // Sessions are looked up by the SHA-256 of the token, so an attacker who
+    // guesses the shape of one still has 256 bits of randomness to find.
+    await expect(openSocketWithToken(NS.collab, 'not-a-real-session-token')).rejects.toThrow();
+  });
+
+  it('refuses a handshake with a revoked session', async () => {
+    const { revokeSession } = await import('../auth/sessions.js');
+    const token = tokenFor(OWNER);
+    await revokeSession(token);
+
+    await expect(openSocketWithToken(NS.collab, token)).rejects.toThrow();
   });
 });
 
@@ -216,7 +238,7 @@ describe('collaborative editing', () => {
 
   it('refuses to open a document in a project the caller cannot see', async () => {
     const project = await seedProject();
-    const stranger = await openSocket(NS.collab, 'user_sock_stranger');
+    const stranger = await openSocket(NS.collab, STRANGER);
 
     const res = await emitWithAck<{ ok: boolean }>(stranger, 'doc:open', {
       fileId: project.entrypointFileId,

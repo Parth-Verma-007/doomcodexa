@@ -1,7 +1,6 @@
 import type { Namespace, Socket } from 'socket.io';
 import { atLeast, type Role, type UserDto } from '@codexa/shared';
-import { TokenError, verifySessionToken } from '../auth/clerk.js';
-import { resolveUser } from '../auth/users.js';
+import { resolveSession } from '../auth/sessions.js';
 import { Project, roleFor, toUserDto } from '../db/models/index.js';
 import { logger } from '../observability/logger.js';
 
@@ -10,9 +9,9 @@ import { logger } from '../observability/logger.js';
  *
  * Two things here matter more than they look:
  *
- *   1. Clerk session tokens are short-lived (~60s). When one expires we send a
- *      distinguishable reason so the client refreshes and reconnects instead of
- *      bouncing the user to a sign-in page (§10).
+ *   1. A rejected handshake carries a machine-readable `reason`, which is how
+ *      the client tells "your session expired, sign in again" apart from "the
+ *      server hiccuped, retry" (§10).
  *
  *   2. Roles are checked on EVERY mutating event, not just at join. A socket
  *      that joined as a viewer can still emit `sync:update`; the check has to
@@ -34,8 +33,18 @@ export function installAuth(namespace: Namespace): void {
 
     void (async () => {
       try {
-        const { clerkId } = await verifySessionToken(token);
-        const user = await resolveUser(clerkId);
+        const user = await resolveSession(token);
+
+        if (!user) {
+          // The `data` field survives to the client as `err.data`, which is how
+          // it tells "you are signed out" apart from a transient failure worth
+          // retrying. Reconnecting with the same dead token would loop.
+          const failure = Object.assign(new Error('Your session has expired.'), {
+            data: { reason: token ? 'invalid_token' : 'missing_token' },
+          });
+          next(failure);
+          return;
+        }
 
         socket.data.userId = String(user._id);
         socket.data.user = toUserDto(user);
@@ -43,15 +52,6 @@ export function installAuth(namespace: Namespace): void {
 
         next();
       } catch (err) {
-        if (err instanceof TokenError) {
-          // The `data` field survives to the client as `err.data`, which is how
-          // it tells "refresh my token" apart from "you are signed out".
-          const failure = Object.assign(new Error(err.message), {
-            data: { reason: err.reason },
-          });
-          next(failure);
-          return;
-        }
         logger.error({ err }, 'socket authentication failed unexpectedly');
         next(new Error('Authentication failed.'));
       }

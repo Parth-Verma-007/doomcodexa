@@ -45,7 +45,7 @@ npm run build -w @codexa/shared && npm run build -w @codexa/api
 npm run runners:build          # must succeed, or execution stays disabled
 
 cp .env.example .env && chmod 600 .env && chown codexa:codexa .env
-$EDITOR .env                   # real Clerk keys, METRICS_PASSWORD, CORS_ORIGINS
+$EDITOR .env                   # MONGODB_URI, METRICS_PASSWORD, CORS_ORIGINS
 
 # ── Stateful services and TLS ─────────────────────────────────────────────────
 cd infra
@@ -58,12 +58,13 @@ systemctl daemon-reload && systemctl enable --now codexa-api
 ```
 
 Frontend: deploy `apps/web` to Vercel with `VITE_API_URL=https://api.yourdomain.com`
-and `VITE_CLERK_PUBLISHABLE_KEY`. Add the Vercel URL to `CORS_ORIGINS` on the
-API and restart it.
+— the only variable it needs. Add the Vercel URL to `CORS_ORIGINS` on the API and
+restart it.
 
-Clerk dashboard → Webhooks → add `https://api.yourdomain.com/api/webhooks/clerk`
-for `user.created`, `user.updated`, `user.deleted`. Copy the signing secret into
-`CLERK_WEBHOOK_SECRET`.
+Authentication needs no setup: accounts and sessions are collections in the same
+Mongo the rest of the app uses, so the first person to visit `/sign-up` creates
+the first account. Nothing outside the box holds anyone's identity, which is why
+the backups below are not optional.
 
 ### Verify
 
@@ -124,15 +125,15 @@ docker compose exec -T mongo mongorestore --archive --gzip --drop \
 
 ## Troubleshooting
 
-| Symptom                                  | Likely cause                                    | Check                                                       |
-| ---------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------- |
-| Run button says execution is unavailable | Runner images missing, or daemon unreachable    | `/ready`, then `journalctl -u codexa-api \| grep execution` |
-| Sockets connect then immediately drop    | `CORS_ORIGINS` does not include the web origin  | Browser console; `.env`                                     |
-| Every socket fails auth                  | Wrong `CLERK_SECRET_KEY`, or clock skew         | `journalctl \| grep authentication`; `timedatectl`          |
-| Edits don't sync but the page loads      | Client connected to `/collab` but not joined    | Network tab: `room:join` ack                                |
-| Runs queue and never start               | Concurrency saturated, or a wedged container    | `codexa_queue_depth`, `docker ps`                           |
-| Disk full                                | Leaked workspaces or image layers               | `du -sh /opt/codexa/workspaces`, `docker system df`         |
-| A viewer can edit                        | Would be a serious bug — do not patch around it | `collab.test.ts`; open a security advisory                  |
+| Symptom                                  | Likely cause                                                        | Check                                                       |
+| ---------------------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Run button says execution is unavailable | Runner images missing, or daemon unreachable                        | `/ready`, then `journalctl -u codexa-api \| grep execution` |
+| Sockets connect then immediately drop    | `CORS_ORIGINS` does not include the web origin                      | Browser console; `.env`                                     |
+| Every socket fails auth                  | Stored sessions are gone — expired, revoked, or the DB was restored | Sign out and in again; handshake error `data.reason`        |
+| Edits don't sync but the page loads      | Client connected to `/collab` but not joined                        | Network tab: `room:join` ack                                |
+| Runs queue and never start               | Concurrency saturated, or a wedged container                        | `codexa_queue_depth`, `docker ps`                           |
+| Disk full                                | Leaked workspaces or image layers                                   | `du -sh /opt/codexa/workspaces`, `docker system df`         |
+| A viewer can edit                        | Would be a serious bug — do not patch around it                     | `collab.test.ts`; open a security advisory                  |
 
 ### Metrics worth alerting on
 
@@ -152,6 +153,8 @@ docker compose exec -T mongo mongorestore --archive --gzip --drop \
 2. `docker ps -a --filter name=codexa-run` — capture before removing.
 3. Preserve `journalctl -u codexa-api --since "2 hours ago"` off-box.
 4. Treat the host as compromised: rebuild it rather than cleaning it.
-5. Rotate every secret in `.env`, including Clerk keys.
+5. Rotate every secret in `.env`, and invalidate every session —
+   `db.sessions.deleteMany({})` signs everyone out and cannot be undone by a
+   stolen token, since the token is only ever stored as its SHA-256.
 6. Before redeploying, switch runners to gVisor (`--runtime=runsc`) or move
    execution to a dedicated host — see [SECURITY.md §4.1](SECURITY.md).

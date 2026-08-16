@@ -19,11 +19,6 @@ const envSchema = z.object({
 
   MONGODB_URI: z.string().min(1).default('mongodb://localhost:27017/codexa'),
 
-  CLERK_PUBLISHABLE_KEY: z.string().optional(),
-  CLERK_SECRET_KEY: z.string().optional(),
-  CLERK_WEBHOOK_SECRET: z.string().optional(),
-  AUTH_DEV_BYPASS: booleanish.default(false),
-
   /**
    * The local engine has no sandbox (see localEngine.ts). Selecting it in
    * production therefore requires saying so out loud.
@@ -78,24 +73,8 @@ const env = parsed.data;
 const isProduction = env.NODE_ENV === 'production';
 const isTest = env.NODE_ENV === 'test';
 
-// The dev bypass short-circuits Clerk and mints a fixed identity. It would be a
-// total authentication bypass in production, so refuse to boot rather than
-// depend on someone noticing the log line.
-if (isProduction && env.AUTH_DEV_BYPASS) {
-  throw new Error('AUTH_DEV_BYPASS must not be enabled when NODE_ENV=production.');
-}
-if (isProduction && !env.CLERK_SECRET_KEY) {
-  throw new Error('CLERK_SECRET_KEY is required when NODE_ENV=production.');
-}
 if (isProduction && !env.METRICS_PASSWORD) {
   throw new Error('METRICS_PASSWORD is required when NODE_ENV=production.');
-}
-
-/** Clerk is usable only when we actually have a secret key. */
-const clerkEnabled = Boolean(env.CLERK_SECRET_KEY) && !env.AUTH_DEV_BYPASS;
-
-if (!clerkEnabled && isProduction) {
-  throw new Error('Refusing to start in production without Clerk configured.');
 }
 
 export const config = {
@@ -113,11 +92,14 @@ export const config = {
   mongoUri: env.MONGODB_URI,
 
   auth: {
-    clerkEnabled,
-    devBypass: env.AUTH_DEV_BYPASS,
-    publishableKey: env.CLERK_PUBLISHABLE_KEY ?? '',
-    secretKey: env.CLERK_SECRET_KEY ?? '',
-    webhookSecret: env.CLERK_WEBHOOK_SECRET ?? '',
+    /**
+     * scrypt's cost parameter. Lowered under test for the same reason every
+     * project lowers its bcrypt rounds: a suite that creates a few hundred
+     * accounts would otherwise spend most of its runtime deliberately burning
+     * CPU, and the thing being tested is the logic around the hash, not the
+     * hash. Never lowered outside tests.
+     */
+    passwordCostN: isTest ? 1024 : 65_536,
   },
 
   exec: {

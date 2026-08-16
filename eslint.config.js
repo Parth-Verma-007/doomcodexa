@@ -37,7 +37,14 @@ export default tseslint.config(
     // Node globals and are allowed to print (they are CLI tools).
     files: ['scripts/**/*.mjs', 'apps/web/e2e/**/*.mjs'],
     languageOptions: {
-      globals: { process: 'readonly', console: 'readonly', URL: 'readonly' },
+      // `fetch` is a global from Node 18 on, which the engines field already
+      // requires — no import needed and none available.
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        URL: 'readonly',
+        fetch: 'readonly',
+      },
     },
     rules: {
       'no-console': 'off',

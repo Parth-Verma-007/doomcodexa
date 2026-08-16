@@ -9,26 +9,21 @@ import type {
   ProjectDto,
   RunDto,
   UpdateFileInput,
+  SignInInput,
+  SignUpInput,
   UpdateProjectInput,
   UserDto,
 } from '@codexa/shared';
 import { env } from './env.js';
+import { getToken, type StoredSession } from './session.js';
 
 /**
  * REST client.
  *
- * The Clerk token getter is registered by a component at mount rather than
- * imported, because `useAuth()` is only available inside the provider tree and
- * this module is also used by non-React code (the socket manager).
+ * Reads the session token straight from the store rather than being handed one,
+ * so it works identically from a component, from the socket manager, and from
+ * a retry that happens long after the component that started it unmounted.
  */
-
-type TokenGetter = () => Promise<string | null>;
-
-let getToken: TokenGetter = async () => null;
-
-export function registerTokenGetter(getter: TokenGetter): void {
-  getToken = getter;
-}
 
 export class ApiError extends Error {
   readonly code: ErrorCode;
@@ -53,18 +48,11 @@ async function call<T>(
   path: string,
   init: Omit<RequestInit, 'body'> & { body?: unknown } = {},
 ): Promise<T> {
-  const token = await getToken();
+  const token = getToken();
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
   if (init.body !== undefined) headers.set('Content-Type', 'application/json');
   if (token) headers.set('Authorization', `Bearer ${token}`);
-
-  // With Clerk bypassed, REST has no token to derive an identity from — the
-  // API reads this header instead. It is only honoured while the API's own
-  // bypass is on, which it refuses to be in production. Without it, REST would
-  // act as the default dev user while sockets acted as `env.devUser`, and the
-  // two would disagree about who you are.
-  if (env.devBypass) headers.set('x-codexa-test-user', env.devUser);
 
   let response: Response;
   try {
@@ -113,6 +101,16 @@ export interface ProjectDetail {
 }
 
 export const api = {
+  // ─── Accounts ───────────────────────────────────────────────────────────────
+
+  signup: (input: SignUpInput) =>
+    call<StoredSession>('/api/auth/signup', { method: 'POST', body: input }),
+
+  login: (input: SignInInput) =>
+    call<StoredSession>('/api/auth/login', { method: 'POST', body: input }),
+
+  logout: () => call<void>('/api/auth/logout', { method: 'POST' }),
+
   me: () =>
     call<{
       user: UserDto;

@@ -3,9 +3,11 @@ import { defineConfig, devices } from '@playwright/test';
 /**
  * End-to-end tests (§14).
  *
- * The collaboration specs need two signed-in identities, which means real Clerk
- * test credentials. Those live in CI secrets; when they are absent the specs
- * skip themselves rather than failing, so a fresh clone still gets a green run.
+ * The collaboration checks need two signed-in identities, and since Codexa owns
+ * authentication they simply register two accounts through the sign-up form
+ * against the local database — one browser context each, because a context is
+ * its own storage jar. Nothing to configure: no test credentials, no secrets, so
+ * a fresh clone gets the same run CI does.
  */
 export default defineConfig({
   testDir: './e2e',

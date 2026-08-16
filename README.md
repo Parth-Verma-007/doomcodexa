@@ -43,7 +43,7 @@ would in a terminal.
 | Frontend  | React 19, Vite 6, Tailwind v4, Monaco, xterm.js |
 | Backend   | Node 22, Express 5, Socket.IO 4                 |
 | Database  | MongoDB 7 (Mongoose)                            |
-| Auth      | Clerk                                           |
+| Auth      | Codexa's own — scrypt passwords, session tokens |
 | Realtime  | Yjs CRDT over Socket.IO; WebRTC for voice/video |
 | Execution | Compilers spawned as child processes of the API |
 
@@ -55,15 +55,15 @@ breaks the client at compile time.
 
 ## Running it locally
 
-**Requirements:** Node 22+. [Clerk](https://clerk.com) is optional — see the
-note after the steps. Docker is not used.
+**Requirements:** Node 22+. No third-party accounts — authentication is part of
+the app. Docker is not used.
 
 ```bash
 git clone <this repo> && cd codexa
 npm install
 
-# 1. Configuration
-cp .env.example .env                     # fill in your Clerk keys
+# 1. Configuration — the defaults work; nothing has to be filled in
+cp .env.example .env
 cp .env.example apps/web/.env.local      # VITE_* values only
 
 # 2. Database — either one, in its own terminal
@@ -75,7 +75,8 @@ npm run dev
 ```
 
 The API listens on `http://localhost:4000`, the web app on
-`http://localhost:5173`.
+`http://localhost:5173`. Open it and create an account at `/sign-up`; there is
+nothing else to configure.
 
 ### Running code
 
@@ -111,16 +112,25 @@ tunnel for an afternoon of pair programming, and a real three-host deployment
 (Vercel for the web app, any container host for the API, Atlas for the
 database). It also explains why the API cannot run on Vercel or Supabase.
 
-### Running without Clerk
+### Accounts
 
-Set `AUTH_DEV_BYPASS=1` for the API and `VITE_AUTH_DEV_BYPASS=1` for the web
-app. Every request resolves to a fixed dev identity, and the API refuses to
-start with it set in production.
+Authentication is Codexa's own — no identity provider, no keys to obtain. Sign
+up with an email, a username and a password of at least 8 characters; sign in
+with either the email or the username. Passwords are hashed with `scrypt`, and
+a successful sign-in returns an opaque session token that the browser stores
+and sends as `Authorization: Bearer <token>` on every request and in the socket
+handshake. Sessions last 30 days, and signing out revokes them on the server.
 
-This is also how you demo collaboration on one machine: add `?as=alice` to any
-URL and that **tab** becomes Alice for as long as it is open. Open a second tab
-with `?as=bob`, share a link from the first, and you have two people editing
-the same file.
+To start from a populated database — three accounts and a shared project:
+
+```bash
+node scripts/seed.mjs     # wipes the local DB, then signs up through the real API
+```
+
+Two identities on one machine now means two **browser profiles**, or one
+ordinary window and one incognito: the session lives in that profile's
+`localStorage`, so two tabs share it. The old per-tab `?as=alice` trick is gone
+along with the bypass it depended on.
 
 ---
 
@@ -144,7 +154,8 @@ apps/
   api/          Express + Socket.IO
     execution/  ExecutionEngine, toolchain discovery, output batching
     realtime/   collab · run · rtc namespaces, Y.Doc cache, awareness
-    http/       REST routes, auth context, error envelope
+    auth/       password hashing, sessions, request context
+    http/       REST routes, error envelope
     db/         Mongoose models
   web/          Vite + React SPA
     lib/        api client, socket manager, Yjs provider, Monaco setup
@@ -152,6 +163,7 @@ apps/
 packages/
   shared/       socket contracts, Zod schemas, path validation, limits
 infra/          Caddyfile, systemd unit, compose for Mongo
+scripts/        local Mongo, database seed
 docs/           PLAN.md · SECURITY.md · ARCHITECTURE.md · RUNBOOK.md
 ```
 
@@ -172,7 +184,7 @@ docs/           PLAN.md · SECURITY.md · ARCHITECTURE.md · RUNBOOK.md
 ## Status
 
 The backend, the realtime layer, the execution engine and the full web client
-are implemented, and 47 API tests plus 26 shared-package tests pass.
+are implemented, and 74 API tests plus 26 shared-package tests pass.
 
 Two things have been verified by driving the real app, not just by unit tests:
 
