@@ -50,7 +50,6 @@ RUN apt-get update \
 
 ENV NODE_ENV=production \
     PORT=4000 \
-    EXEC_ENGINE=local \
     # The local engine has no sandbox. It is opted into here because this image
     # is built for it; read the note above before pointing it at the internet.
     EXEC_LOCAL_ALLOW_UNSANDBOXED=1 \
