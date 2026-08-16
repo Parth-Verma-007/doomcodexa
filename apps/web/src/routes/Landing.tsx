@@ -3,6 +3,7 @@ import { Code2, Play, ShieldCheck, Terminal, Users, Zap } from 'lucide-react';
 import { LANGUAGE_LIST } from '@codexa/shared';
 import { SignedIn, SignedOut } from '../lib/auth.js';
 import { Button } from '../components/Button.js';
+import { StarButton } from '../components/StarButton.js';
 import { ThemeToggle } from '../components/ThemeToggle.js';
 import { ArrowRevealButton } from '../components/ArrowRevealButton.js';
 import { LanguageCarousel } from '../components/LanguageCarousel.js';
@@ -96,29 +97,39 @@ function Hero() {
       </span>
 
       {/*
+        Two texts, one heading. Each line is its own block and scrambles in as
+        its own wave, so the break is deliberate rather than whatever the line
+        breaker happens to choose at a given width. They stay inside a single
+        <h1> — two headings would claim the page has two titles.
+
         Pink is the *effect* only. Each character churns in pink and flares pink
         as it lands, then the component clears its inline colour and the run's
         own styling takes over — so the settled heading is exactly the ink and
         accent gradient it always was.
 
-        The full stop rides along inside the gradient run rather than trailing
-        it: every character is its own inline-block, so a separate trailing "."
-        would be a break opportunity and could wrap to a line of its own.
+        The second line's gradient is applied through `segments` rather than to
+        the block itself: the segment's wrapper is an inline span sized to the
+        text, so `bg-clip-text` paints across the words instead of across the
+        full centred line.
       */}
-      <TextMatrixRain
-        as="h1"
-        segments={[
-          { text: 'Code together, ' },
-          {
-            text: 'actually together.',
-            className:
-              'bg-[linear-gradient(100deg,var(--color-accent),#9c6bff_55%,#21b8a6)] bg-clip-text text-transparent',
-          },
-        ]}
-        className="mx-auto max-w-3xl text-balance text-4xl font-bold leading-[1.08] tracking-tight sm:text-6xl"
-      >
-        Code together, actually together.
-      </TextMatrixRain>
+      <h1 className="mx-auto max-w-3xl text-balance text-4xl font-bold leading-[1.08] tracking-tight sm:text-6xl">
+        <TextMatrixRain as="span" className="block">
+          Code together
+        </TextMatrixRain>
+        <TextMatrixRain
+          as="span"
+          segments={[
+            {
+              text: 'actually together.',
+              className:
+                'bg-[linear-gradient(100deg,var(--color-accent),#9c6bff_55%,#21b8a6)] bg-clip-text text-transparent',
+            },
+          ]}
+          className="block"
+        >
+          actually together.
+        </TextMatrixRain>
+      </h1>
 
       <p className="mx-auto mt-6 max-w-2xl text-pretty text-lg leading-relaxed text-ink-muted">
         A collaborative IDE for C, C++, Java and Python. Every keystroke syncs live, cursors move
@@ -129,9 +140,7 @@ function Hero() {
       <div className="mt-9 flex flex-wrap justify-center gap-3">
         <SignedOut>
           <Link to="/sign-up">
-            <Button variant="primary" size="lg" sheen>
-              Start coding free
-            </Button>
+            <StarButton>Start coding free</StarButton>
           </Link>
           <Link to="/sign-in">
             <Button variant="glass" size="lg">
@@ -284,10 +293,10 @@ function ClosingCta() {
           <div className="mt-7 flex justify-center">
             <SignedOut>
               <Link to="/sign-up">
-                <Button variant="primary" size="lg" sheen>
+                <StarButton>
                   <Play size={16} />
                   Start coding free
-                </Button>
+                </StarButton>
               </Link>
             </SignedOut>
             <SignedIn>

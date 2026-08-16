@@ -8,10 +8,12 @@ import {
   Files,
   History,
   MessageSquare,
+  Moon,
   Phone,
   Play,
   Settings,
   Share2,
+  Sun,
   TerminalSquare,
   WifiOff,
 } from 'lucide-react';
@@ -195,6 +197,8 @@ function Toolbar() {
   const { project, projectId, files, canEdit, members } = useProject();
   const activeFileId = useUiStore((s) => s.activeFileId);
   const toggleTerminal = useUiStore((s) => s.toggleTerminal);
+  const theme = useUiStore((s) => s.theme);
+  const setTheme = useUiStore((s) => s.setTheme);
   const current = useRunStore((s) => s.current);
   const starting = useRunStore((s) => s.starting);
 
@@ -283,6 +287,19 @@ function Toolbar() {
 
       <div className="ml-auto flex items-center gap-2">
         <PresenceBar />
+
+        {/* The Settings panel carries the same control, but switching theme
+            mid-session should not mean opening a panel and losing the sidebar
+            you had there. The icon shows what you get, not where you are. */}
+        <button
+          type="button"
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          title={`Switch to the ${theme === 'dark' ? 'light' : 'dark'} theme`}
+          aria-label={`Switch to the ${theme === 'dark' ? 'light' : 'dark'} theme`}
+          className="rounded p-1.5 text-ink-muted hover:bg-surface-2 hover:text-ink"
+        >
+          {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+        </button>
 
         <button
           type="button"

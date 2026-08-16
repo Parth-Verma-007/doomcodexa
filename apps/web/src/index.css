@@ -311,6 +311,168 @@
   }
 }
 
+/*
+ * ─── The "Start coding free" button ───────────────────────────────────────────
+ *
+ * Adapted from a Uiverse component by MuhammadHasann. Two departures from the
+ * original, both forced by where it runs:
+ *
+ *   1. **Every colour is a token.** The original is a fixed peach on near
+ *      black. Here the fill, the border and the glow all derive from
+ *      `--color-accent`, so the button flips with the theme like everything
+ *      else. The sparkles need the opposite treatment per theme — near white
+ *      reads against the dark canvas and vanishes against the light one — so
+ *      they get their own pair of variables.
+ *
+ *   2. **The sparkles hide with `opacity`, not a negative `z-index`.** The
+ *      original parks them at `z-index: -5` so the opaque fill covers them at
+ *      rest, which only holds while the button is outside any stacking context.
+ *      The closing call to action puts it inside a `.codexa-glass` panel, and
+ *      `backdrop-filter` creates one — the sparkles would sit on the panel in
+ *      plain view.
+ *
+ * Size, weight and radius are left to the component's utilities so it matches
+ * `<Button size="lg">`.
+ */
+@layer components {
+  .codexa-star-button {
+    --star-fill: color-mix(in oklab, var(--color-accent) 10%, white);
+    --star-glow: color-mix(in oklab, var(--color-accent) 45%, white);
+
+    border: 2px solid var(--color-accent);
+    background: var(--color-accent);
+    color: white;
+    cursor: pointer;
+    /* Both states carry the same two shadows — one inset, one not — because a
+       list that changes shape between states cannot be interpolated. */
+    box-shadow:
+      inset 0 1px 0 color-mix(in oklab, white 28%, transparent),
+      0 0 0 transparent;
+    transition:
+      background-color 300ms ease-in-out,
+      color 300ms ease-in-out,
+      box-shadow 300ms ease-in-out,
+      transform 150ms ease;
+  }
+
+  .codexa-star-button:hover:not(:disabled) {
+    background: transparent;
+    color: var(--color-accent);
+    box-shadow:
+      inset 0 1px 0 transparent,
+      0 0 25px color-mix(in oklab, var(--color-accent) 55%, transparent);
+  }
+
+  [data-theme='light'] .codexa-star-button {
+    /* Near-white sparkles disappear the moment the fill goes transparent over a
+       white page, so on the light theme they are the accent itself. */
+    --star-fill: var(--color-accent-hover);
+    --star-glow: var(--color-accent);
+  }
+
+  .codexa-star-button .codexa-star {
+    --star-time: 1s;
+    --star-ease: cubic-bezier(0, 0.4, 0, 1.01);
+
+    position: absolute;
+    height: auto;
+    z-index: 2;
+    fill: var(--star-fill);
+    opacity: 0;
+    filter: drop-shadow(0 0 0 var(--star-glow));
+    pointer-events: none;
+    transition:
+      top var(--star-time) var(--star-ease),
+      left var(--star-time) var(--star-ease),
+      filter var(--star-time) var(--star-ease),
+      opacity 260ms ease-in-out;
+  }
+
+  .codexa-star-button:hover:not(:disabled) .codexa-star {
+    opacity: 1;
+    filter: drop-shadow(0 0 10px var(--star-glow));
+  }
+
+  /* Rest positions sit inside the button, hover positions scatter outwards.
+     The staggered durations are what keep it from reading as one rigid burst.
+     The scatter is a fan — up-left, up, up-right, down-right — rather than the
+     original's, which threw two sparkles straight out to the right. On the
+     landing page a second button stands 12px away, and they landed on top of
+     its label. */
+  .codexa-star-1 {
+    --star-ease: cubic-bezier(0.05, 0.83, 0.43, 0.96);
+    top: 20%;
+    left: 20%;
+    width: 25px;
+  }
+  .codexa-star-button:hover:not(:disabled) .codexa-star-1 {
+    top: -80%;
+    left: -30%;
+  }
+
+  .codexa-star-2 {
+    top: 45%;
+    left: 45%;
+    width: 15px;
+  }
+  .codexa-star-button:hover:not(:disabled) .codexa-star-2 {
+    top: -25%;
+    left: 10%;
+  }
+
+  .codexa-star-3 {
+    top: 40%;
+    left: 40%;
+    width: 5px;
+  }
+  .codexa-star-button:hover:not(:disabled) .codexa-star-3 {
+    top: 55%;
+    left: 25%;
+  }
+
+  .codexa-star-4 {
+    --star-time: 0.8s;
+    top: 20%;
+    left: 40%;
+    width: 8px;
+  }
+  .codexa-star-button:hover:not(:disabled) .codexa-star-4 {
+    top: -30%;
+    left: 84%;
+  }
+
+  .codexa-star-5 {
+    --star-time: 0.6s;
+    top: 25%;
+    left: 45%;
+    width: 15px;
+  }
+  .codexa-star-button:hover:not(:disabled) .codexa-star-5 {
+    top: 100%;
+    left: 86%;
+  }
+
+  .codexa-star-6 {
+    --star-time: 0.8s;
+    --star-ease: ease;
+    top: 5%;
+    left: 50%;
+    width: 5px;
+  }
+  .codexa-star-button:hover:not(:disabled) .codexa-star-6 {
+    top: 5%;
+    left: 60%;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* The global rule pins every transition to nothing, which would leave the
+       sparkles snapping in and out of place. Drop them altogether instead. */
+    .codexa-star-button .codexa-star {
+      display: none;
+    }
+  }
+}
+
 @keyframes codexa-drift-a {
   from {
     transform: translate3d(0, 0, 0) scale(1);
