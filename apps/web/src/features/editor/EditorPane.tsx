@@ -30,20 +30,27 @@ export function EditorPane({ fileId }: { fileId: string }) {
   const following = useUiStore((s) => s.followingPeerId);
 
   const [status, setStatus] = useState<'connecting' | 'synced' | 'disconnected'>('connecting');
-  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+  /**
+   * The editor is state, not a ref, and that is load-bearing.
+   *
+   * Monaco arrives in a lazily-loaded chunk of several megabytes, so `onMount`
+   * fires long after this component first renders. Held in a ref it did not
+   * re-render, so every effect below ran once against a null editor, bailed,
+   * and was never asked again — no CRDT provider, no `doc:open`, an empty
+   * document and no presence for anyone else. On a local dev server Monaco won
+   * that race and it all looked fine; over a real network it lost.
+   */
+  const [editor, setEditor] = useState<monaco.editor.IStandaloneCodeEditor | null>(null);
   const bindingRef = useRef<MonacoBinding | null>(null);
   const providerRef = useRef<DocumentProvider | null>(null);
   const docRef = useRef<Y.Doc | null>(null);
 
   const file = useMemo(() => files.find((f) => f.id === fileId), [files, fileId]);
 
-  const handleMount: OnMount = (editor) => {
-    editorRef.current = editor;
-  };
+  const handleMount: OnMount = (instance) => setEditor(instance);
 
   // ─── Bind this file to a CRDT document ──────────────────────────────────────
   useEffect(() => {
-    const editor = editorRef.current;
     if (!editor || !awareness || !file) return;
 
     const doc = new Y.Doc();
@@ -80,9 +87,12 @@ export function EditorPane({ fileId }: { fileId: string }) {
       providerRef.current = null;
       docRef.current = null;
     };
-    // `file.name` intentionally excluded: a rename must not tear down the doc.
+    // `editor` and `file?.id` are here so this re-runs when Monaco finishes
+    // loading and when the file list arrives — either can land after the first
+    // render, and without them the effect bails once and is never retried.
+    // `file.name` is still excluded: a rename must not tear down the doc.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fileId, awareness, projectId]);
+  }, [editor, fileId, file?.id, awareness, projectId]);
 
   // ─── Remote cursor colours and labels ───────────────────────────────────────
   useEffect(() => {
@@ -95,7 +105,6 @@ export function EditorPane({ fileId }: { fileId: string }) {
 
   // ─── Publish our own viewport for follow mode ───────────────────────────────
   useEffect(() => {
-    const editor = editorRef.current;
     if (!editor || !awareness) return;
 
     const publish = () => {
@@ -108,11 +117,10 @@ export function EditorPane({ fileId }: { fileId: string }) {
     const disposable = editor.onDidScrollChange(publish);
     publish();
     return () => disposable.dispose();
-  }, [awareness, fileId]);
+  }, [editor, awareness, fileId]);
 
   // ─── Follow mode: track the followed peer's viewport ────────────────────────
   useEffect(() => {
-    const editor = editorRef.current;
     if (!editor || !awareness || !following) return;
 
     const apply = () => {
@@ -126,17 +134,16 @@ export function EditorPane({ fileId }: { fileId: string }) {
     awareness.on('change', apply);
     apply();
     return () => awareness.off('change', apply);
-  }, [awareness, following]);
+  }, [editor, awareness, following]);
 
   // Any local keystroke breaks follow — you cannot be dragged around while typing.
   useEffect(() => {
-    const editor = editorRef.current;
     if (!editor || !following) return;
     const disposable = editor.onDidChangeModelContent(() =>
       useUiStore.getState().setFollowing(null),
     );
     return () => disposable.dispose();
-  }, [following]);
+  }, [editor, following]);
 
   if (!file) {
     return (
