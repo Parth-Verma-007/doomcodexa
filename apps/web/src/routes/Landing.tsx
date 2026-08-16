@@ -8,6 +8,7 @@ import { ThemeToggle } from '../components/ThemeToggle.js';
 import { ArrowRevealButton } from '../components/ArrowRevealButton.js';
 import { LanguageCarousel } from '../components/LanguageCarousel.js';
 import TextMatrixRain from '../components/TextMatrixRain.js';
+import { CursorRibbon } from '../components/decor/CursorRibbon.js';
 import { GradientBloom } from '../components/decor/GradientBloom.js';
 import { GridMesh } from '../components/decor/GridMesh.js';
 import { FramedPanel } from '../components/decor/FramedPanel.js';
@@ -16,10 +17,16 @@ import { cn } from '../lib/utils.js';
 export function Landing() {
   return (
     <div className="relative h-full overflow-y-auto bg-surface-0">
-      {/* Fixed to the viewport so the bloom stays put while content scrolls. */}
+      {/*
+        Fixed to the viewport so the bloom stays put while content scrolls —
+        which is also what the ribbons need, since they are drawn in viewport
+        coordinates. Last in the layer so they ride over the mesh and the bloom,
+        and behind the content, where they read without fighting the text.
+      */}
       <div className="pointer-events-none fixed inset-0">
         <GridMesh size={34} />
         <GradientBloom />
+        <CursorRibbon />
       </div>
 
       <div className="relative">
