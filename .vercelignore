@@ -1,0 +1,31 @@
+# What Vercel does NOT need uploaded.
+#
+# Only the web app is built here; the API is a long-lived server and is
+# deployed elsewhere (docs/DEPLOY.md). Everything below is either rebuilt on
+# Vercel, irrelevant to the build, or — in the case of the local Mongo data —
+# held open by a running mongod, which fails the upload outright on Windows.
+
+node_modules
+.git
+
+# Rebuilt by vercel.json's buildCommand.
+dist
+apps/api/dist
+apps/web/dist
+packages/shared/dist
+*.tsbuildinfo
+
+# Local development data and output.
+.local-mongo-data
+.env
+.env.local
+screenshots
+playwright-report
+test-results
+*.log
+
+# Not part of the web build.
+infra
+docs
+.github
+.claude

@@ -34,3 +34,8 @@ screenshots/
 # Claude Code: `settings.json` is shared project config and is committed.
 # `settings.local.json` is personal (your own permission grants) and is not.
 .claude/settings.local.json
+
+# Vercel CLI: the project link, and the OIDC token `vercel link` writes to a
+# root .env.local. The `.env` rules at the top of this file already cover the
+# token; `.env.example` is committed and must stay that way.
+.vercel
