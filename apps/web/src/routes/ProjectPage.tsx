@@ -343,6 +343,7 @@ function Toolbar() {
 function ActivityBar() {
   const sidebarPanel = useUiStore((s) => s.sidebarPanel);
   const rightPanel = useUiStore((s) => s.rightPanel);
+  const unreadChat = useUiStore((s) => s.unreadChat);
   const setSidebarPanel = useUiStore((s) => s.setSidebarPanel);
   const setRightPanel = useUiStore((s) => s.setRightPanel);
 
@@ -371,6 +372,7 @@ function ActivityBar() {
       <ActivityButton
         label="Chat"
         active={rightPanel === 'chat'}
+        badge={unreadChat}
         onClick={() => setRightPanel('chat')}
       >
         <MessageSquare size={17} />
@@ -400,20 +402,25 @@ function ActivityButton({
   active,
   onClick,
   className,
+  badge = false,
   children,
 }: {
   label: string;
   active: boolean;
   onClick: () => void;
   className?: string;
+  /** An unread marker, e.g. a message that arrived while this panel was shut. */
+  badge?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      title={label}
-      aria-label={label}
+      title={badge ? `${label} — new messages` : label}
+      // The dot is decorative, so the state it signals has to reach a screen
+      // reader through the name instead.
+      aria-label={badge ? `${label}, new messages` : label}
       aria-pressed={active}
       className={cn(
         'relative rounded-md p-2 transition-colors',
@@ -425,6 +432,12 @@ function ActivityButton({
         <span className="absolute inset-y-1 -left-1 w-0.5 rounded-full bg-accent" aria-hidden />
       ) : null}
       {children}
+      {badge ? (
+        <span
+          aria-hidden
+          className="absolute right-1 top-1 size-2 rounded-full bg-accent ring-2 ring-surface-1"
+        />
+      ) : null}
     </button>
   );
 }

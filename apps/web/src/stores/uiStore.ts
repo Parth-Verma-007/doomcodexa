@@ -30,6 +30,15 @@ interface UiState {
 
   sidebarPanel: 'files' | 'members' | 'runs' | 'settings' | null;
   rightPanel: 'chat' | 'call' | null;
+  /**
+   * Someone said something while the chat panel was shut.
+   *
+   * Deliberately a flag rather than a count: the dot answers "is there anything
+   * new", and a number would imply we track what you have read message by
+   * message, which we do not. Never persisted — a dot surviving a reload would
+   * point at a conversation you have already seen.
+   */
+  unreadChat: boolean;
   terminalVisible: boolean;
 
   /** socketId of the peer whose viewport we are following, if any. */
@@ -49,6 +58,7 @@ interface UiState {
 
   setSidebarPanel: (panel: UiState['sidebarPanel']) => void;
   setRightPanel: (panel: UiState['rightPanel']) => void;
+  markChatUnread: () => void;
   toggleTerminal: () => void;
   setFollowing: (peerId: string | null) => void;
 }
@@ -67,6 +77,7 @@ export const useUiStore = create<UiState>()(
 
       sidebarPanel: 'files',
       rightPanel: null,
+      unreadChat: false,
       terminalVisible: true,
       followingPeerId: null,
 
@@ -117,8 +128,17 @@ export const useUiStore = create<UiState>()(
 
       setSidebarPanel: (sidebarPanel) =>
         set({ sidebarPanel: get().sidebarPanel === sidebarPanel ? null : sidebarPanel }),
-      setRightPanel: (rightPanel) =>
-        set({ rightPanel: get().rightPanel === rightPanel ? null : rightPanel }),
+      setRightPanel: (rightPanel) => {
+        // Clicking the panel you are already on closes it, so read the result
+        // rather than the argument — opening chat is what clears the dot, and
+        // toggling it shut is not opening it.
+        const next = get().rightPanel === rightPanel ? null : rightPanel;
+        set({ rightPanel: next, unreadChat: next === 'chat' ? false : get().unreadChat });
+      },
+
+      markChatUnread: () => {
+        if (get().rightPanel !== 'chat') set({ unreadChat: true });
+      },
       toggleTerminal: () => set({ terminalVisible: !get().terminalVisible }),
       setFollowing: (followingPeerId) => set({ followingPeerId }),
     }),

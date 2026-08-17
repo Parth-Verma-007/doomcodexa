@@ -135,6 +135,12 @@ export function ProjectProvider({
     staleTime: Infinity,
   });
 
+  /** Readable from socket handlers that are bound once and never re-bound. */
+  const myUserId = useRef<string | null>(null);
+  useEffect(() => {
+    myUserId.current = me?.user.id ?? null;
+  }, [me]);
+
   useEffect(() => {
     const awareness = awarenessRef.current;
     if (!awareness || !me) return;
@@ -234,10 +240,19 @@ export function ProjectProvider({
       void queryClient.invalidateQueries({ queryKey: ['project', projectId] });
     };
 
-    const onChatMessage = ({ message }: { message: MessageDto }) =>
+    const onChatMessage = ({ message }: { message: MessageDto }) => {
       setMessages((current) =>
         current.some((m) => m.id === message.id) ? current : [...current, message],
       );
+      // Flag the Chat button so a message sent while the panel is shut is not
+      // silently missed. Only this handler does it — chat history loaded on
+      // arrival is not news. Your own message is not news either, and the id
+      // comes from a ref because this listener is bound once per project and
+      // would otherwise close over whoever `me` was on the first render.
+      if (message.author.id !== myUserId.current) {
+        useUiStore.getState().markChatUnread();
+      }
+    };
 
     const onServerError = ({ message, context }: { message: string; context?: string }) => {
       // Per-keystroke rejections would be unbearable as toasts; the read-only
